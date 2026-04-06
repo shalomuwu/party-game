@@ -1,60 +1,195 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Buzz In!</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #222; color: white; padding-top: 50px; }
-        input { font-size: 20px; padding: 10px; text-align: center; border-radius: 5px; margin-bottom: 20px; width: 80%; max-width: 300px; }
-        .btn { font-size: 24px; padding: 15px 40px; margin: 10px; border-radius: 10px; cursor: pointer; border: none; font-weight: bold; }
-        #connectBtn { background-color: #4CAF50; color: white; }
-        #buzzBtn { background-color: #f44336; color: white; font-size: 40px; padding: 40px 80px; display: none; margin: auto; mt: 50px;}
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            /* Sleek dark gradient background */
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation; /* Stops annoying double-tap zooming */
+        }
+
+        #setupScreen, #gameScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 400px;
+            /* Glassmorphism effect */
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        #gameScreen {
+            display: none;
+            background: none;
+            box-shadow: none;
+            backdrop-filter: none;
+            padding: 0;
+        }
+
+        h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #00ffcc; /* Neon cyan accent */
+        }
+
+        input {
+            width: 100%;
+            font-size: 22px;
+            padding: 15px;
+            margin-bottom: 25px;
+            border: none;
+            border-radius: 10px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            outline: none;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        input:focus {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffcc;
+        }
+
+        .btn {
+            width: 100%;
+            font-size: 24px;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.1s;
+            color: white;
+        }
+
+        #connectBtn {
+            background: linear-gradient(90deg, #00b4db, #0083b0);
+            box-shadow: 0 5px 15px rgba(0, 180, 219, 0.4);
+        }
+
+        #connectBtn:active {
+            transform: scale(0.95);
+        }
+
+        /* The Massive Buzzer */
+        #buzzBtn {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #ff416c, #ff4b2b);
+            box-shadow: 0 15px 35px rgba(255, 65, 108, 0.5), inset 0 -10px 20px rgba(0,0,0,0.2);
+            font-size: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        #buzzBtn:active {
+            /* Satisfying click animation */
+            transform: scale(0.90);
+            box-shadow: 0 5px 15px rgba(255, 65, 108, 0.5), inset 0 -5px 10px rgba(0,0,0,0.2);
+            background: #ff4b2b;
+        }
+
+        .player-name-display {
+            margin-top: 30px;
+            font-size: 20px;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
 
     <div id="setupScreen">
-        <h2>Enter PC IP</h2>
-        <input type="text" id="ipInput" placeholder="192.168.1.x">
-        
-        <h2>Create Nickname</h2>
-        <input type="text" id="nameInput" placeholder="Enter your name">
-        <br>
-        <button id="connectBtn" class="btn" onclick="connectToServer()">CONNECT</button>
+        <h2>Join Game</h2>
+        <input type="text" id="nameInput" placeholder="ENTER NICKNAME" maxlength="12" autocomplete="off">
+        <button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
     </div>
 
-    <button id="buzzBtn" class="btn" onclick="sendSignal()">BUZZ IN!</button>
+    <div id="gameScreen">
+        <button id="buzzBtn" class="btn" onclick="sendSignal()">BUZZ</button>
+        <div class="player-name-display" id="displayName"></div>
+    </div>
 
     <script>
+        // ⚠️ PASTE YOUR CLOUDFLARE WSS LINK RIGHT HERE:
+        const SERVER_URL = "wss://democratic-recorded-keyboard-shoe.trycloudflare.com"; 
+
         let socket;
+        let playerName = "";
 
         function connectToServer() {
-            let ip = document.getElementById("ipInput").value;
-            socket = new WebSocket("wss://democratic-recorded-keyboard-shoe.trycloudflare.com");
+            // Grab the nickname
+            playerName = document.getElementById("nameInput").value.trim();
+            
+            // Give a funny name if they left it blank
+            if (playerName === "") {
+                playerName = "Ghost_" + Math.floor(Math.random() * 1000);
+            }
+
+            document.getElementById("connectBtn").innerText = "CONNECTING...";
+
+            // Connect using your hardcoded Cloudflare link!
+            socket = new WebSocket(SERVER_URL);
 
             socket.onopen = function(e) {
+                // Swap the screens
                 document.getElementById("setupScreen").style.display = "none";
-                document.getElementById("buzzBtn").style.display = "block";
+                document.getElementById("gameScreen").style.display = "flex";
+                document.getElementById("displayName").innerText = "Playing as: " + playerName;
             };
 
             socket.onerror = function(error) {
-                alert("Connection failed! Check the IP address.");
+                alert("Connection failed! Make sure the host PC is running the game.");
+                document.getElementById("connectBtn").innerText = "JOIN";
             };
         }
 
         function sendSignal() {
-            // Grab the name the player typed in
-            let playerName = document.getElementById("nameInput").value;
-            
-            // If they left it blank, give them a funny default name
-            if (playerName === "") {
-                playerName = "Anonymous Ghost";
+            // Send the name to Godot
+            if(socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(playerName);
+                
+                // Make the button flash white when tapped
+                const btn = document.getElementById("buzzBtn");
+                btn.style.background = "white";
+                btn.style.color = "#ff4b2b";
+                setTimeout(() => {
+                    btn.style.background = "linear-gradient(145deg, #ff416c, #ff4b2b)";
+                    btn.style.color = "white";
+                }, 100);
             }
-            
-            // Send their actual name to Godot!
-            socket.send(playerName);
         }
     </script>
-
 </body>
 </html>
