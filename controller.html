@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Controller</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #222; color: white; padding-top: 50px; }
+        input { font-size: 20px; padding: 10px; text-align: center; border-radius: 5px; margin-bottom: 20px; width: 80%; max-width: 300px; }
+        .btn { font-size: 24px; padding: 15px 40px; margin: 10px; border-radius: 10px; cursor: pointer; border: none; font-weight: bold; }
+        #connectBtn { background-color: #4CAF50; color: white; }
+        #buzzBtn { background-color: #f44336; color: white; font-size: 40px; padding: 40px 80px; display: none; margin: auto; mt: 50px;}
+    </style>
+</head>
+<body>
+
+    <div id="setupScreen">
+        <h2>Enter PC IP</h2>
+        <input type="text" id="ipInput" placeholder="192.168.1.x">
+        
+        <h2>Create Nickname</h2>
+        <input type="text" id="nameInput" placeholder="Enter your name">
+        <br>
+        <button id="connectBtn" class="btn" onclick="connectToServer()">CONNECT</button>
+    </div>
+
+    <button id="buzzBtn" class="btn" onclick="sendSignal()">BUZZ IN!</button>
+
+    <script>
+        let socket;
+
+        function connectToServer() {
+            let ip = document.getElementById("ipInput").value;
+            socket = new WebSocket("ws://" + ip + ":8080");
+
+            socket.onopen = function(e) {
+                document.getElementById("setupScreen").style.display = "none";
+                document.getElementById("buzzBtn").style.display = "block";
+            };
+
+            socket.onerror = function(error) {
+                alert("Connection failed! Check the IP address.");
+            };
+        }
+
+        function sendSignal() {
+            // Grab the name the player typed in
+            let playerName = document.getElementById("nameInput").value;
+            
+            // If they left it blank, give them a funny default name
+            if (playerName === "") {
+                playerName = "Anonymous Ghost";
+            }
+            
+            // Send their actual name to Godot!
+            socket.send(playerName);
+        }
+    </script>
+
+</body>
+</html>
