@@ -30,7 +30,7 @@
 
         function connectToServer() {
             let ip = document.getElementById("ipInput").value;
-            socket = new WebSocket("ws://" + ip + ":8080");
+            socket = new WebSocket("wss://democratic-recorded-keyboard-shoe.trycloudflare.com");
 
             socket.onopen = function(e) {
                 document.getElementById("setupScreen").style.display = "none";
