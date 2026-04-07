@@ -25,7 +25,8 @@
 
     <div id="gameScreen">
         <div class="player-name-display" id="playerNameDisplay"></div>
-        <button id="buzzBtn" class="btn" onclick="sendBuzzer()">BUZZ IN!</button>
+        <h2 id="waitingMessage">Waiting for Host to start the game...</h2>
+        <button id="buzzBtn" class="btn" style="display: none;" onclick="sendBuzzer()">BUZZ IN!</button>
     </div>
 
     <script>
@@ -59,6 +60,16 @@
                 // Tell Godot we joined
                 socket.send("JOIN," + playerName);
             };
+			socket.onmessage = function(event) {
+            let message = event.data;
+            console.log("Godot says: " + message);
+
+            // If Godot yells START_GAME, switch the UI!
+            if (message === "START_GAME") {
+                document.getElementById("waitingMessage").style.display = "none";
+                document.getElementById("buzzBtn").style.display = "inline-block";
+            }
+        };
 
             // 4. If the tunnel breaks
             socket.onclose = function() {
