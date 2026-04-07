@@ -60,8 +60,14 @@
                 // Tell Godot we joined
                 socket.send("JOIN," + playerName);
             };
-			socket.onmessage = function(event) {
+			socket.onmessage = async function(event) {
             let message = event.data;
+
+            // THE FIX: If Godot sent a binary Blob, unpack it into text!
+            if (message instanceof Blob) {
+                message = await message.text();
+            }
+
             console.log("Godot says: " + message);
 
             // If Godot yells START_GAME, switch the UI!
