@@ -9,9 +9,12 @@
         input, button { padding: 15px; font-size: 20px; border-radius: 10px; margin: 10px; border: none; }
         .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .btn:active { transform: scale(0.95); }
-        #buzzBtn { background: #ff4b2b; padding: 40px; font-size: 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-        #gameScreen { display: none; }
-        .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 30px; }
+        .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
+        
+        /* NEW STYLES FOR IMAGES */
+        .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
+        .meme-option:active { border-color: #00b4d8; transform: scale(0.95); }
+        #imageScreen { display: none; }
     </style>
 </head>
 <body>
@@ -23,61 +26,50 @@
         <button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
     </div>
 
-    <div id="gameScreen">
+    <div id="gameScreen" style="display: none;">
         <div class="player-name-display" id="playerNameDisplay"></div>
         <h2 id="waitingMessage">Waiting for Host to start the game...</h2>
-        <button id="buzzBtn" class="btn" style="display: none;" onclick="sendBuzzer()">BUZZ IN!</button>
+        
+        <div id="imageScreen">
+            <h3>Pick your template!</h3>
+            <img src="https://placehold.co/300x300/444444/FFF?text=Meme+1" class="meme-option" onclick="pickImage(this.src)">
+            <img src="https://placehold.co/300x300/666666/FFF?text=Meme+2" class="meme-option" onclick="pickImage(this.src)">
+            <img src="https://placehold.co/300x300/888888/FFF?text=Meme+3" class="meme-option" onclick="pickImage(this.src)">
+        </div>
     </div>
 
     <script>
         // ⚠️ PASTE YOUR DAILY CLOUDFLARE WSS LINK RIGHT HERE ⚠️
-        const SERVER_URL = "wss://aluminum-hospitality-forms-prisoners.trycloudflare.com";
+        const SERVER_URL = "wss://YOUR-LINK-HERE.trycloudflare.com";
 
         let socket;
         let playerName = "";
+        let selectedImage = "";
 
         function connectToServer() {
-            // 1. Grab the name
             playerName = document.getElementById("nameInput").value.trim();
-            if (playerName === "") {
-                playerName = "Ghost_" + Math.floor(Math.random() * 1000);
-            }
+            if (playerName === "") playerName = "Ghost_" + Math.floor(Math.random() * 1000);
 
             document.getElementById("connectBtn").innerText = "CONNECTING...";
-
-            // 2. Open the Tunnel to Godot
             socket = new WebSocket(SERVER_URL);
 
-            // 3. When Godot opens the door
             socket.onopen = function() {
-                console.log("Connected to Godot!");
-                
-                // Hide Setup, Show Game Screen
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
                 document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
-
-                // Tell Godot we joined
                 socket.send("JOIN," + playerName);
             };
-			socket.onmessage = async function(event) {
-            let message = event.data;
 
-            // THE FIX: If Godot sent a binary Blob, unpack it into text!
-            if (message instanceof Blob) {
-                message = await message.text();
-            }
+            socket.onmessage = async function(event) {
+                let message = event.data;
+                if (message instanceof Blob) { message = await message.text(); }
 
-            console.log("Godot says: " + message);
+                if (message === "START_GAME") {
+                    document.getElementById("waitingMessage").style.display = "none";
+                    document.getElementById("imageScreen").style.display = "block";
+                }
+            };
 
-            // If Godot yells START_GAME, switch the UI!
-            if (message === "START_GAME") {
-                document.getElementById("waitingMessage").style.display = "none";
-                document.getElementById("buzzBtn").style.display = "inline-block";
-            }
-        };
-
-            // 4. If the tunnel breaks
             socket.onclose = function() {
                 alert("Disconnected from server.");
                 document.getElementById("setupScreen").style.display = "block";
@@ -86,11 +78,17 @@
             };
         }
 
-        // 5. When they hit the buzzer
-        function sendBuzzer() {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send("BUZZ," + playerName);
-            }
+        // NEW FUNCTION: Send the image choice to Godot
+        function pickImage(imgUrl) {
+            selectedImage = imgUrl;
+            
+            // Send to Godot
+            socket.send("PICKED," + playerName + "," + selectedImage);
+            
+            // Hide images and show waiting text again
+            document.getElementById("imageScreen").style.display = "none";
+            document.getElementById("waitingMessage").innerText = "Great choice! Waiting for others...";
+            document.getElementById("waitingMessage").style.display = "block";
         }
     </script>
 </body>
