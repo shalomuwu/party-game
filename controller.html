@@ -1,193 +1,78 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Buzz In!</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meme Battle Controller</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&display=swap');
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Poppins', sans-serif;
-        }
-
-        body {
-            /* Sleek dark gradient background */
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            touch-action: manipulation; /* Stops annoying double-tap zooming */
-        }
-
-        #setupScreen, #gameScreen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 90%;
-            max-width: 400px;
-            /* Glassmorphism effect */
-            background: rgba(255, 255, 255, 0.1);
-            padding: 40px 20px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        #gameScreen {
-            display: none;
-            background: none;
-            box-shadow: none;
-            backdrop-filter: none;
-            padding: 0;
-        }
-
-        h2 {
-            font-size: 28px;
-            margin-bottom: 20px;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #00ffcc; /* Neon cyan accent */
-        }
-
-        input {
-            width: 100%;
-            font-size: 22px;
-            padding: 15px;
-            margin-bottom: 25px;
-            border: none;
-            border-radius: 10px;
-            text-align: center;
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-            outline: none;
-            font-weight: 600;
-            transition: transform 0.2s;
-        }
-
-        input:focus {
-            transform: scale(1.05);
-            box-shadow: 0 0 15px #00ffcc;
-        }
-
-        .btn {
-            width: 100%;
-            font-size: 24px;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.1s;
-            color: white;
-        }
-
-        #connectBtn {
-            background: linear-gradient(90deg, #00b4db, #0083b0);
-            box-shadow: 0 5px 15px rgba(0, 180, 219, 0.4);
-        }
-
-        #connectBtn:active {
-            transform: scale(0.95);
-        }
-
-        /* The Massive Buzzer */
-        #buzzBtn {
-            width: 250px;
-            height: 250px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #ff416c, #ff4b2b);
-            box-shadow: 0 15px 35px rgba(255, 65, 108, 0.5), inset 0 -10px 20px rgba(0,0,0,0.2);
-            font-size: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-        }
-
-        #buzzBtn:active {
-            /* Satisfying click animation */
-            transform: scale(0.90);
-            box-shadow: 0 5px 15px rgba(255, 65, 108, 0.5), inset 0 -5px 10px rgba(0,0,0,0.2);
-            background: #ff4b2b;
-        }
-
-        .player-name-display {
-            margin-top: 30px;
-            font-size: 20px;
-            color: #aaa;
-        }
+        body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 50px; }
+        input, button { padding: 15px; font-size: 20px; border-radius: 10px; margin: 10px; border: none; }
+        .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
+        .btn:active { transform: scale(0.95); }
+        #buzzBtn { background: #ff4b2b; padding: 40px; font-size: 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        #gameScreen { display: none; }
+        .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 30px; }
     </style>
 </head>
 <body>
 
     <div id="setupScreen">
-        <h2>Join Game</h2>
-        <input type="text" id="nameInput" placeholder="ENTER NICKNAME" maxlength="12" autocomplete="off">
+        <h2>JOIN GAME</h2>
+        <input type="text" id="nameInput" placeholder="ENTER NICKNAME" maxlength="12">
+        <br>
         <button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
     </div>
 
     <div id="gameScreen">
-        <button id="buzzBtn" class="btn" onclick="sendSignal()">BUZZ</button>
-        <div class="player-name-display" id="displayName"></div>
+        <div class="player-name-display" id="playerNameDisplay"></div>
+        <button id="buzzBtn" class="btn" onclick="sendBuzzer()">BUZZ IN!</button>
     </div>
 
     <script>
-        // ⚠️ PASTE YOUR CLOUDFLARE WSS LINK RIGHT HERE:
-        const SERVER_URL = "wss://mutual-approx-females-charity.trycloudflare.com"; 
+        // ⚠️ PASTE YOUR DAILY CLOUDFLARE WSS LINK RIGHT HERE ⚠️
+        const SERVER_URL = "wss://aluminum-hospitality-forms-prisoners.trycloudflare.com";
 
         let socket;
         let playerName = "";
 
         function connectToServer() {
-            // Grab the nickname
+            // 1. Grab the name
             playerName = document.getElementById("nameInput").value.trim();
-            
-            // Give a funny name if they left it blank
             if (playerName === "") {
                 playerName = "Ghost_" + Math.floor(Math.random() * 1000);
             }
 
             document.getElementById("connectBtn").innerText = "CONNECTING...";
 
-            // Connect using your hardcoded Cloudflare link!
+            // 2. Open the Tunnel to Godot
             socket = new WebSocket(SERVER_URL);
 
-            socket.onopen = function(e) {
-                // Swap the screens
+            // 3. When Godot opens the door
+            socket.onopen = function() {
+                console.log("Connected to Godot!");
+                
+                // Hide Setup, Show Game Screen
                 document.getElementById("setupScreen").style.display = "none";
-                document.getElementById("gameScreen").style.display = "flex";
-                document.getElementById("displayName").innerText = "Playing as: " + playerName;
+                document.getElementById("gameScreen").style.display = "block";
+                document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
+
+                // Tell Godot we joined
+                socket.send("JOIN," + playerName);
             };
 
-            socket.onerror = function(error) {
-                alert("Connection failed! Make sure the host PC is running the game.");
+            // 4. If the tunnel breaks
+            socket.onclose = function() {
+                alert("Disconnected from server.");
+                document.getElementById("setupScreen").style.display = "block";
+                document.getElementById("gameScreen").style.display = "none";
                 document.getElementById("connectBtn").innerText = "JOIN";
             };
         }
 
-        function sendSignal() {
-            // Send the name to Godot
-            if(socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(playerName);
-                
-                // Make the button flash white when tapped
-                const btn = document.getElementById("buzzBtn");
-                btn.style.background = "white";
-                btn.style.color = "#ff4b2b";
-                setTimeout(() => {
-                    btn.style.background = "linear-gradient(145deg, #ff416c, #ff4b2b)";
-                    btn.style.color = "white";
-                }, 100);
+        // 5. When they hit the buzzer
+        function sendBuzzer() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send("BUZZ," + playerName);
             }
         }
     </script>
