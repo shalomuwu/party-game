@@ -60,99 +60,134 @@
         let socket;
         let playerName = "";
         let selectedImage = "";
+        let localTimer = null;
+
+        // --- NEW CLOCK SYSTEM ---
+        function startLocalTimer(seconds) {
+            clearInterval(localTimer);
+            let time = seconds;
+            let display = document.getElementById("waitingMessage");
+            display.style.display = "block";
+            
+            localTimer = setInterval(() => {
+                if (time <= 0) {
+                    clearInterval(localTimer);
+                    display.innerText = "⏳ Time's up! Waiting for server...";
+                } else {
+                    display.innerText = "⏳ Time Left: " + time + "s";
+                    time--;
+                }
+            }, 1000);
+        }
 
         function connectToServer() {
-            playerName = document.getElementById("nameInput").value.trim();
-            if (playerName === "") playerName = "Ghost_" + Math.floor(Math.random() * 1000);
-
+            playerName = document.getElementById("nameInput").value.trim() || ("Player" + Math.floor(Math.random()*1000));
             document.getElementById("connectBtn").innerText = "CONNECTING...";
             socket = new WebSocket(SERVER_URL);
 
-            socket.onopen = function() {
+            socket.onopen = () => {
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
                 document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
                 socket.send("JOIN," + playerName);
             };
 
-            socket.onmessage = async function(event) {
-                let message = event.data;
-                if (message instanceof Blob) { message = await message.text(); }
+            socket.onmessage = async (event) => {
+                let message = event.data instanceof Blob ? await event.data.text() : event.data;
+                let parts = message.split(",");
+                let command = parts[0];
 
-                if (message === "START_GAME") {
-                    document.getElementById("waitingMessage").style.display = "none";
-                    document.getElementById("imageScreen").style.display = "block";
-                }
-                
-                if (message.startsWith("CAPTION,")) {
-                    let parts = message.split(",");
-                    selectedImage = parts[1]; 
-                    document.getElementById("waitingMessage").style.display = "none";
-                    document.getElementById("imageScreen").style.display = "none";
-                    document.getElementById("captionScreen").style.display = "block";
-                    document.getElementById("captionImage").src = selectedImage; 
-                }
-
-                // NEW: IF GODOT SAYS "VOTE", SHOW THE RED & BLUE BUTTONS!
-                if (message.startsWith("VOTE_TIME,")) {
-                    let parts = message.split(",");
-                    document.getElementById("waitingMessage").style.display = "none";
+                if (command === "NEW_ROUND") {
+                    let seconds = parseInt(parts[1]);
+                    document.getElementById("topTextInput").value = "";
+                    document.getElementById("bottomTextInput").value = "";
+                    selectedImage = "";
+                    
                     document.getElementById("captionScreen").style.display = "none";
+                    document.getElementById("voteScreen").style.display = "none";
+                    document.getElementById("matchWinnerScreen").style.display = "none";
+                    
+                    document.getElementById("imageScreen").style.display = "block";
+                    startLocalTimer(seconds); // Starts 30s timer!
+                }
+
+                if (command === "VOTE_TIME") {
+                    let seconds = parseInt(parts[1]);
+                    document.getElementById("captionScreen").style.display = "none";
+                    document.getElementById("imageScreen").style.display = "none";
                     
                     document.getElementById("voteScreen").style.display = "block";
-                    document.getElementById("voteBtn1").innerText = parts[1]; // Put Player 1's name on Red
-                    document.getElementById("voteBtn2").innerText = parts[2]; // Put Player 2's name on Blue
+                    document.getElementById("voteBtn1").innerText = parts[2]; 
+                    document.getElementById("voteBtn2").innerText = parts[3]; 
+                    startLocalTimer(seconds); // Starts 20s timer!
                 }
-				// THE FINAL PHASE: DECLARE THE WINNER!
-				if (message.startsWith("WINNER,")) {
-					let parts = message.split(",");
-					let winnerName = parts[1];
 
-					document.getElementById("voteScreen").style.display = "none";
-					document.getElementById("waitingMessage").innerText = "🏆 " + winnerName + " 🏆";
-					document.getElementById("waitingMessage").style.display = "block";
-				}
-				
-            };
+                if (command === "MATCH_WINNER") {
+                    clearInterval(localTimer); // Stop clocks
+                    let winner = parts[1];
+                    let imgUrl = parts[2];
+                    let points = parts[3];
+                    
+                    document.getElementById("voteScreen").style.display = "none";
+                    
+                    // Show custom Winner Screen!
+                    let winnerScreen = document.getElementById("matchWinnerScreen");
+                    if (!winnerScreen) {
+                        // Create it if it doesn't exist
+                        winnerScreen = document.createElement("div");
+                        winnerScreen.id = "matchWinnerScreen";
+                        document.getElementById("gameScreen").appendChild(winnerScreen);
+                    }
+                    winnerScreen.style.display = "block";
+                    
+                    if (winner === "TIE") {
+                        winnerScreen.innerHTML = `<h2>IT'S A TIE!</h2>`;
+                    } else {
+                        winnerScreen.innerHTML = `
+                            <h2>WINNER: ${winner}</h2>
+                            <h3 style="color: yellow;">+${points} Points!</h3>
+                            <img src="${imgUrl}" style="width: 80%; border-radius: 10px; border: 3px solid yellow;">
+                        `;
+                    }
+                    document.getElementById("waitingMessage").style.display = "none";
+                }
 
-            socket.onclose = function() {
-                alert("Disconnected from server.");
-                location.reload();
+                if (command === "ROUND_SUMMARY") {
+                    document.getElementById("matchWinnerScreen").style.display = "none";
+                    document.getElementById("waitingMessage").innerText = "Round over! Tallying scores...";
+                    document.getElementById("waitingMessage").style.display = "block";
+                }
+
+                if (command === "GAME_OVER") {
+                    clearInterval(localTimer);
+                    document.getElementById("matchWinnerScreen").style.display = "none";
+                    document.getElementById("waitingMessage").innerText = "🏆 ULTIMATE WINNER: " + parts[1] + " 🏆";
+                    document.getElementById("waitingMessage").style.display = "block";
+                }
             };
         }
 
+        // --- BUTTON ACTIONS ---
         function pickImage(imgUrl) {
-            // 1. Save the image this specific player clicked
             selectedImage = imgUrl; 
-            
-            // 2. Hide the image choices
             document.getElementById("imageScreen").style.display = "none";
-            
-            // 3. Instantly show the text boxes for THIS player only!
             document.getElementById("captionScreen").style.display = "block";
             document.getElementById("captionImage").src = selectedImage; 
-            
-            // (Optional) Tell Godot they picked one, just so Godot knows!
             socket.send("PICKED," + playerName + "," + imgUrl);
         }
 
         function submitMeme() {
-            let topText = document.getElementById("topTextInput").value.trim().replace(/,/g, "");
-            let bottomText = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
-            socket.send("SUBMIT_MEME," + playerName + "," + topText + "," + bottomText + "," + selectedImage);
+            let t = document.getElementById("topTextInput").value.trim().replace(/,/g, "");
+            let b = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
+            socket.send("SUBMIT_MEME," + playerName + "," + t + "," + b + "," + selectedImage);
             
             document.getElementById("captionScreen").style.display = "none";
-            document.getElementById("waitingMessage").innerText = "Joke submitted! Waiting for other players...";
-            document.getElementById("waitingMessage").style.display = "block";
+            document.getElementById("waitingMessage").innerText = "Submitted! Waiting for clock...";
         }
 
-        // NEW: SEND THE VOTE BACK TO GODOT
         function castVote(votedFor) {
             socket.send("VOTE," + playerName + "," + votedFor);
             document.getElementById("voteScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = "Vote locked in!";
-            document.getElementById("waitingMessage").style.display = "block";
         }
     </script>
-</body>
-</html>
