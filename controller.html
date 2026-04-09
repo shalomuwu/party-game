@@ -112,10 +112,18 @@
         }
 
         function pickImage(imgUrl) {
-            socket.send("PICKED," + playerName + "," + imgUrl);
+            // 1. Save the image this specific player clicked
+            selectedImage = imgUrl; 
+            
+            // 2. Hide the image choices
             document.getElementById("imageScreen").style.display = "none";
-            document.getElementById("waitingMessage").innerText = "Great choice! Waiting for Host...";
-            document.getElementById("waitingMessage").style.display = "block";
+            
+            // 3. Instantly show the text boxes for THIS player only!
+            document.getElementById("captionScreen").style.display = "block";
+            document.getElementById("captionImage").src = selectedImage; 
+            
+            // (Optional) Tell Godot they picked one, just so Godot knows!
+            socket.send("PICKED," + playerName + "," + imgUrl);
         }
 
         function submitMeme() {
