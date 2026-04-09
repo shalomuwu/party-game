@@ -11,7 +11,6 @@
         .btn:active { transform: scale(0.95); }
         .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
         
-        /* The Gallery layout for the 3 random images */
         #imageGallery { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 20px; }
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; transition: 0.2s;}
         .meme-option:active { border-color: #00b4d8; transform: scale(0.95); }
@@ -20,7 +19,6 @@
         #voteBtn2 { background: #3a86ff; }
         #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px;}
         
-        /* CSS for the final meme renders */
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
         .meme-display img { width: 100%; border-radius: 10px; border: 3px solid #00b4d8; display: block; }
         .meme-text { 
@@ -67,21 +65,49 @@
 
         let socket, playerName = "", selectedImage = "", localTimer = null;
 
-        // --- NEW: GENERATE 3 RANDOM IMAGES (.jpeg VERSION) ---
-        function generateRandomHand() {
+        // --- NEW: THE DETECTIVE (Checks if an image actually exists on GitHub) ---
+        function checkImage(url) {
+            return new Promise((resolve) => {
+                let img = new Image();
+                img.onload = () => resolve(true);  // GitHub says: YES!
+                img.onerror = () => resolve(false); // GitHub says: 404 Not Found!
+                img.src = url;
+            });
+        }
+
+        // --- NEW: SMART RANDOM HAND GENERATOR ---
+        async function generateRandomHand() {
             const gallery = document.getElementById("imageGallery");
-            let galleryHTML = "";
-            let chosenMemes = [];
+            gallery.innerHTML = "<p style='color: #48cae4; font-weight: bold;'>Shuffling the deck...</p>";
             
-            // Keep picking random numbers until we have 3 unique ones
-            while (chosenMemes.length < 3) {
-                let randomNum = Math.floor(Math.random() * 100) + 1; // Generates 1 to 100
+            let chosenMemes = [];
+            let attempts = 0;
+            
+            // Loop until we find 3 REAL images (or we try 150 times to prevent freezing)
+            while (chosenMemes.length < 3 && attempts < 150) {
+                attempts++;
+                
+                // Guess a number between 1 and 100
+                let randomNum = Math.floor(Math.random() * 100) + 1; 
+                
                 if (!chosenMemes.includes(randomNum)) {
-                    chosenMemes.push(randomNum);
+                    let url = `images/meme${randomNum}.jpeg`;
+                    let exists = await checkImage(url); // Ping GitHub!
+                    
+                    if (exists) {
+                        chosenMemes.push(randomNum); // We found a real one! Keep it!
+                    }
                 }
             }
+
+            // Fallback just in case GitHub is acting up or no images exist
+            if (chosenMemes.length === 0) {
+                gallery.innerHTML = "<p style='color: red;'>No images found! Upload meme1.jpeg to GitHub!</p>";
+                return;
+            }
             
-            // Build the HTML for those 3 specific images (NOW USING .jpeg)
+            // Build the HTML for the 3 verified images
+            let galleryHTML = "";
             for (let i = 0; i < chosenMemes.length; i++) {
                 galleryHTML += `<img src="images/meme${chosenMemes[i]}.jpeg" class="meme-option" onclick="pickImage(this.src)">`;
             }
@@ -132,11 +158,11 @@
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
                     
-                    // Generate a brand new hand of 3 random images for this round!
-                    generateRandomHand();
-                    
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
+
+                    // Start hunting for the 3 real images!
+                    await generateRandomHand();
                 }
 
                 if (command === "VOTE_TIME") {
