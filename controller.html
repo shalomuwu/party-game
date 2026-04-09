@@ -11,9 +11,19 @@
         .btn:active { transform: scale(0.95); }
         .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
-        #voteBtn1 { background: #ef233c; }
-        #voteBtn2 { background: #3a86ff; }
         #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px;}
+        
+        /* NEW: CSS to make the memes look real on the phone! */
+        .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
+        .meme-display img { width: 100%; border-radius: 10px; border: 3px solid #00b4d8; display: block; }
+        .meme-text { 
+            position: absolute; width: 100%; text-align: center; color: white; 
+            font-family: 'Impact', sans-serif; font-size: 26px; text-transform: uppercase; 
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; 
+            left: 0; padding: 0 10px; box-sizing: border-box; word-wrap: break-word; pointer-events: none;
+        }
+        .meme-top { top: 10px; }
+        .meme-bottom { bottom: 10px; }
     </style>
 </head>
 <body>
@@ -21,8 +31,7 @@
     <div id="setupScreen">
         <h2>JOIN GAME</h2>
         <input type="text" id="nameInput" placeholder="ENTER NICKNAME" maxlength="12">
-        <br>
-        <button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
+        <br><button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
     </div>
 
     <div id="gameScreen" style="display: none;">
@@ -31,9 +40,9 @@
         
         <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
-            <img src="https://placehold.co/300x300/444444/FFF?text=Meme+1" class="meme-option" onclick="pickImage(this.src)">
-            <img src="https://placehold.co/300x300/666666/FFF?text=Meme+2" class="meme-option" onclick="pickImage(this.src)">
-            <img src="https://placehold.co/300x300/888888/FFF?text=Meme+3" class="meme-option" onclick="pickImage(this.src)">
+            <img src="https://placehold.co/300x300/444444/FFF.png?text=Meme+1" class="meme-option" onclick="pickImage(this.src)">
+            <img src="https://placehold.co/300x300/666666/FFF.png?text=Meme+2" class="meme-option" onclick="pickImage(this.src)">
+            <img src="https://placehold.co/300x300/888888/FFF.png?text=Meme+3" class="meme-option" onclick="pickImage(this.src)">
         </div>
 
         <div id="captionScreen" style="display: none;">
@@ -44,24 +53,14 @@
             <br><button class="btn" onclick="submitMeme()">FINISH</button>
         </div>
 
-        <div id="voteScreen" style="display: none;">
-            <h3>Vote for the best meme!</h3>
-            <button id="voteBtn1" class="btn" onclick="castVote(this.innerText)">Player 1</button>
-            <br><br>
-            <button id="voteBtn2" class="btn" onclick="castVote(this.innerText)">Player 2</button>
-        </div>
-
+        <div id="voteScreen" style="display: none;"></div>
         <div id="matchWinnerScreen" style="display: none; margin-top: 20px;"></div>
     </div>
 
     <script>
-        // ⚠️ YOUR PERMANENT SERVER LINK ⚠️
         const SERVER_URL = "wss://game.shalomuwu.com";
 
-        let socket;
-        let playerName = "";
-        let selectedImage = "";
-        let localTimer = null;
+        let socket, playerName = "", selectedImage = "", localTimer = null;
 
         function startLocalTimer(seconds) {
             clearInterval(localTimer);
@@ -113,20 +112,40 @@
 
                 if (command === "VOTE_TIME") {
                     let seconds = parseInt(parts[1]);
+                    // Godot now sends: Command, Time, Player1, Top1, Bot1, Img1, Player2, Top2, Bot2, Img2
+                    let p1 = parts[2], t1 = parts[3], b1 = parts[4], i1 = parts[5];
+                    let p2 = parts[6], t2 = parts[7], b2 = parts[8], i2 = parts[9];
+
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
                     
-                    document.getElementById("voteScreen").style.display = "block";
-                    document.getElementById("voteBtn1").innerText = parts[2]; 
-                    document.getElementById("voteBtn2").innerText = parts[3]; 
+                    let voteScreen = document.getElementById("voteScreen");
+                    voteScreen.style.display = "block";
+                    
+                    // Injecting the FULL images into the buttons!
+                    voteScreen.innerHTML = `
+                        <h3>Vote for the best meme!</h3>
+                        <div class="meme-display">
+                            <img src="${i1}">
+                            <div class="meme-text meme-top">${t1}</div>
+                            <div class="meme-text meme-bottom">${b1}</div>
+                        </div>
+                        <br><button class="btn" style="background:#ef233c; width:80%; margin-top:0;" onclick="castVote('${p1}')">Vote for ${p1}</button>
+                        <br><br>
+                        <div class="meme-display">
+                            <img src="${i2}">
+                            <div class="meme-text meme-top">${t2}</div>
+                            <div class="meme-text meme-bottom">${b2}</div>
+                        </div>
+                        <br><button class="btn" style="background:#3a86ff; width:80%; margin-top:0;" onclick="castVote('${p2}')">Vote for ${p2}</button>
+                    `;
                     startLocalTimer(seconds);
                 }
 
                 if (command === "MATCH_WINNER") {
                     clearInterval(localTimer); 
-                    let winner = parts[1];
-                    let imgUrl = parts[2];
-                    let points = parts[3];
+                    // Godot now sends: Command, Winner, Img, Points, Top, Bot
+                    let winner = parts[1], imgUrl = parts[2], points = parts[3], topT = parts[4], botT = parts[5];
                     
                     document.getElementById("voteScreen").style.display = "none";
                     document.getElementById("waitingMessage").style.display = "none";
@@ -140,7 +159,11 @@
                         winnerScreen.innerHTML = `
                             <h2>WINNER: ${winner}</h2>
                             <h3 style="color: yellow;">+${points} Points!</h3>
-                            <img src="${imgUrl}" style="width: 80%; border-radius: 10px; border: 3px solid yellow;">
+                            <div class="meme-display">
+                                <img src="${imgUrl}" style="border-color: yellow;">
+                                <div class="meme-text meme-top">${topT}</div>
+                                <div class="meme-text meme-bottom">${botT}</div>
+                            </div>
                         `;
                     }
                 }
@@ -158,11 +181,7 @@
                     document.getElementById("waitingMessage").style.display = "block";
                 }
             };
-
-            socket.onclose = () => {
-                alert("Disconnected from server.");
-                location.reload();
-            };
+            socket.onclose = () => { alert("Disconnected."); location.reload(); };
         }
 
         function pickImage(imgUrl) {
@@ -177,7 +196,6 @@
             let t = document.getElementById("topTextInput").value.trim().replace(/,/g, "");
             let b = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
             socket.send("SUBMIT_MEME," + playerName + "," + t + "," + b + "," + selectedImage);
-            
             document.getElementById("captionScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = "Submitted! Waiting for clock...";
             document.getElementById("waitingMessage").style.display = "block";
