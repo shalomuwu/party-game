@@ -103,6 +103,16 @@
                     document.getElementById("voteBtn1").innerText = parts[1]; // Put Player 1's name on Red
                     document.getElementById("voteBtn2").innerText = parts[2]; // Put Player 2's name on Blue
                 }
+				// THE FINAL PHASE: DECLARE THE WINNER!
+				if (message.startsWith("WINNER,")) {
+					let parts = message.split(",");
+					let winnerName = parts[1];
+
+					document.getElementById("voteScreen").style.display = "none";
+					document.getElementById("waitingMessage").innerText = "🏆 " + winnerName + " 🏆";
+					document.getElementById("waitingMessage").style.display = "block";
+				}
+				
             };
 
             socket.onclose = function() {
