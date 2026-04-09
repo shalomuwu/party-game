@@ -10,11 +10,8 @@
         .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .btn:active { transform: scale(0.95); }
         .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
-        
-        /* NEW STYLES FOR IMAGES */
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
         .meme-option:active { border-color: #00b4d8; transform: scale(0.95); }
-        #imageScreen { display: none; }
     </style>
 </head>
 <body>
@@ -30,16 +27,27 @@
         <div class="player-name-display" id="playerNameDisplay"></div>
         <h2 id="waitingMessage">Waiting for Host to start the game...</h2>
         
-        <div id="imageScreen">
+        <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
             <img src="https://placehold.co/300x300/444444/FFF?text=Meme+1" class="meme-option" onclick="pickImage(this.src)">
             <img src="https://placehold.co/300x300/666666/FFF?text=Meme+2" class="meme-option" onclick="pickImage(this.src)">
             <img src="https://placehold.co/300x300/888888/FFF?text=Meme+3" class="meme-option" onclick="pickImage(this.src)">
         </div>
+
+        <div id="captionScreen" style="display: none;">
+            <h3>Write your best joke!</h3>
+            <img id="captionImage" src="" style="width: 80%; max-width: 250px; border-radius: 10px; margin-bottom: 10px;">
+            <br>
+            <input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;">
+            <br>
+            <input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;">
+            <br>
+            <button class="btn" onclick="submitMeme()">FINISH</button>
+        </div>
     </div>
 
     <script>
-        // ⚠️ PASTE YOUR DAILY CLOUDFLARE WSS LINK RIGHT HERE ⚠️
+        // ⚠️ YOUR PERMANENT SERVER LINK ⚠️
         const SERVER_URL = "wss://game.shalomuwu.com";
 
         let socket;
@@ -68,6 +76,20 @@
                     document.getElementById("waitingMessage").style.display = "none";
                     document.getElementById("imageScreen").style.display = "block";
                 }
+                
+                // NEW: IF GODOT SAYS "CAPTION", SHOW THE TEXT BOXES!
+                if (message.startsWith("CAPTION,")) {
+                    let parts = message.split(",");
+                    selectedImage = parts[1]; // Save the image URL
+
+                    // Hide Phase 1
+                    document.getElementById("waitingMessage").style.display = "none";
+                    document.getElementById("imageScreen").style.display = "none";
+
+                    // Show Phase 2
+                    document.getElementById("captionScreen").style.display = "block";
+                    document.getElementById("captionImage").src = selectedImage; // Put the image on screen
+                }
             };
 
             socket.onclose = function() {
@@ -78,16 +100,26 @@
             };
         }
 
-        // NEW FUNCTION: Send the image choice to Godot
         function pickImage(imgUrl) {
-            selectedImage = imgUrl;
-            
-            // Send to Godot
-            socket.send("PICKED," + playerName + "," + selectedImage);
-            
-            // Hide images and show waiting text again
+            socket.send("PICKED," + playerName + "," + imgUrl);
             document.getElementById("imageScreen").style.display = "none";
-            document.getElementById("waitingMessage").innerText = "Great choice! Waiting for others...";
+            document.getElementById("waitingMessage").innerText = "Great choice! Waiting for Host...";
+            document.getElementById("waitingMessage").style.display = "block";
+        }
+
+        // NEW: SEND THE FINISHED JOKE TO GODOT
+        function submitMeme() {
+            let topText = document.getElementById("topTextInput").value.trim();
+            let bottomText = document.getElementById("bottomTextInput").value.trim();
+            
+            // Clean up commas so we don't break the server data
+            topText = topText.replace(/,/g, ""); 
+            bottomText = bottomText.replace(/,/g, "");
+
+            socket.send("SUBMIT_MEME," + playerName + "," + topText + "," + bottomText + "," + selectedImage);
+            
+            document.getElementById("captionScreen").style.display = "none";
+            document.getElementById("waitingMessage").innerText = "Joke submitted! Waiting for other players...";
             document.getElementById("waitingMessage").style.display = "block";
         }
     </script>
