@@ -10,10 +10,17 @@
         .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .btn:active { transform: scale(0.95); }
         .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
-        .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
+        
+        /* The Gallery layout for the 3 random images */
+        #imageGallery { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; transition: 0.2s;}
+        .meme-option:active { border-color: #00b4d8; transform: scale(0.95); }
+        
+        #voteBtn1 { background: #ef233c; }
+        #voteBtn2 { background: #3a86ff; }
         #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px;}
         
-        /* NEW: CSS to make the memes look real on the phone! */
+        /* CSS for the final meme renders */
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
         .meme-display img { width: 100%; border-radius: 10px; border: 3px solid #00b4d8; display: block; }
         .meme-text { 
@@ -40,9 +47,7 @@
         
         <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
-            <img src="https://placehold.co/300x300/444444/FFF.png?text=Meme+1" class="meme-option" onclick="pickImage(this.src)">
-            <img src="https://placehold.co/300x300/666666/FFF.png?text=Meme+2" class="meme-option" onclick="pickImage(this.src)">
-            <img src="https://placehold.co/300x300/888888/FFF.png?text=Meme+3" class="meme-option" onclick="pickImage(this.src)">
+            <div id="imageGallery"></div>
         </div>
 
         <div id="captionScreen" style="display: none;">
@@ -61,6 +66,27 @@
         const SERVER_URL = "wss://game.shalomuwu.com";
 
         let socket, playerName = "", selectedImage = "", localTimer = null;
+
+        // --- NEW: GENERATE 3 RANDOM IMAGES (.jpeg VERSION) ---
+        function generateRandomHand() {
+            const gallery = document.getElementById("imageGallery");
+            let galleryHTML = "";
+            let chosenMemes = [];
+            
+            // Keep picking random numbers until we have 3 unique ones
+            while (chosenMemes.length < 3) {
+                let randomNum = Math.floor(Math.random() * 100) + 1; // Generates 1 to 100
+                if (!chosenMemes.includes(randomNum)) {
+                    chosenMemes.push(randomNum);
+                }
+            }
+            
+            // Build the HTML for those 3 specific images (NOW USING .jpeg)
+            for (let i = 0; i < chosenMemes.length; i++) {
+                galleryHTML += `<img src="images/meme${chosenMemes[i]}.jpeg" class="meme-option" onclick="pickImage(this.src)">`;
+            }
+            gallery.innerHTML = galleryHTML;
+        }
 
         function startLocalTimer(seconds) {
             clearInterval(localTimer);
@@ -106,13 +132,15 @@
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
                     
+                    // Generate a brand new hand of 3 random images for this round!
+                    generateRandomHand();
+                    
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
                 }
 
                 if (command === "VOTE_TIME") {
                     let seconds = parseInt(parts[1]);
-                    // Godot now sends: Command, Time, Player1, Top1, Bot1, Img1, Player2, Top2, Bot2, Img2
                     let p1 = parts[2], t1 = parts[3], b1 = parts[4], i1 = parts[5];
                     let p2 = parts[6], t2 = parts[7], b2 = parts[8], i2 = parts[9];
 
@@ -122,7 +150,6 @@
                     let voteScreen = document.getElementById("voteScreen");
                     voteScreen.style.display = "block";
                     
-                    // Injecting the FULL images into the buttons!
                     voteScreen.innerHTML = `
                         <h3>Vote for the best meme!</h3>
                         <div class="meme-display">
@@ -144,7 +171,6 @@
 
                 if (command === "MATCH_WINNER") {
                     clearInterval(localTimer); 
-                    // Godot now sends: Command, Winner, Img, Points, Top, Bot
                     let winner = parts[1], imgUrl = parts[2], points = parts[3], topT = parts[4], botT = parts[5];
                     
                     document.getElementById("voteScreen").style.display = "none";
