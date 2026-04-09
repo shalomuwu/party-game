@@ -5,16 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meme Battle</title>
     <style>
-        body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 50px; }
+        body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 30px; }
         input, button { padding: 15px; font-size: 20px; border-radius: 10px; margin: 10px; border: none; }
         .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .btn:active { transform: scale(0.95); }
         .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
-        
-        /* Red and Blue Voting Buttons! */
         #voteBtn1 { background: #ef233c; }
         #voteBtn2 { background: #3a86ff; }
+        #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px;}
     </style>
 </head>
 <body>
@@ -28,7 +27,7 @@
 
     <div id="gameScreen" style="display: none;">
         <div class="player-name-display" id="playerNameDisplay"></div>
-        <h2 id="waitingMessage">Waiting for Host...</h2>
+        <div id="waitingMessage">Waiting for Host...</div>
         
         <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
@@ -51,6 +50,8 @@
             <br><br>
             <button id="voteBtn2" class="btn" onclick="castVote(this.innerText)">Player 2</button>
         </div>
+
+        <div id="matchWinnerScreen" style="display: none; margin-top: 20px;"></div>
     </div>
 
     <script>
@@ -103,12 +104,12 @@
                     document.getElementById("bottomTextInput").value = "";
                     selectedImage = "";
                     
+                    document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
-                    document.getElementById("matchWinnerScreen").style.display = "none";
                     
                     document.getElementById("imageScreen").style.display = "block";
-                    startLocalTimer(seconds); // Starts 30s timer!
+                    startLocalTimer(seconds);
                 }
 
                 if (command === "VOTE_TIME") {
@@ -119,25 +120,19 @@
                     document.getElementById("voteScreen").style.display = "block";
                     document.getElementById("voteBtn1").innerText = parts[2]; 
                     document.getElementById("voteBtn2").innerText = parts[3]; 
-                    startLocalTimer(seconds); // Starts 20s timer!
+                    startLocalTimer(seconds);
                 }
 
                 if (command === "MATCH_WINNER") {
-                    clearInterval(localTimer); // Stop clocks
+                    clearInterval(localTimer); 
                     let winner = parts[1];
                     let imgUrl = parts[2];
                     let points = parts[3];
                     
                     document.getElementById("voteScreen").style.display = "none";
+                    document.getElementById("waitingMessage").style.display = "none";
                     
-                    // Show custom Winner Screen!
                     let winnerScreen = document.getElementById("matchWinnerScreen");
-                    if (!winnerScreen) {
-                        // Create it if it doesn't exist
-                        winnerScreen = document.createElement("div");
-                        winnerScreen.id = "matchWinnerScreen";
-                        document.getElementById("gameScreen").appendChild(winnerScreen);
-                    }
                     winnerScreen.style.display = "block";
                     
                     if (winner === "TIE") {
@@ -149,7 +144,6 @@
                             <img src="${imgUrl}" style="width: 80%; border-radius: 10px; border: 3px solid yellow;">
                         `;
                     }
-                    document.getElementById("waitingMessage").style.display = "none";
                 }
 
                 if (command === "ROUND_SUMMARY") {
@@ -164,6 +158,11 @@
                     document.getElementById("waitingMessage").innerText = "🏆 ULTIMATE WINNER: " + parts[1] + " 🏆";
                     document.getElementById("waitingMessage").style.display = "block";
                 }
+            };
+
+            socket.onclose = () => {
+                alert("Disconnected from server.");
+                location.reload();
             };
         }
 
@@ -183,11 +182,15 @@
             
             document.getElementById("captionScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = "Submitted! Waiting for clock...";
+            document.getElementById("waitingMessage").style.display = "block";
         }
 
         function castVote(votedFor) {
             socket.send("VOTE," + playerName + "," + votedFor);
             document.getElementById("voteScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = "Vote locked in!";
+            document.getElementById("waitingMessage").style.display = "block";
         }
     </script>
+</body>
+</html>
