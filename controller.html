@@ -65,17 +65,15 @@
 
         let socket, playerName = "", selectedImage = "", localTimer = null;
 
-        // --- NEW: THE DETECTIVE (Checks if an image actually exists on GitHub) ---
         function checkImage(url) {
             return new Promise((resolve) => {
                 let img = new Image();
-                img.onload = () => resolve(true);  // GitHub says: YES!
-                img.onerror = () => resolve(false); // GitHub says: 404 Not Found!
+                img.onload = () => resolve(true);  
+                img.onerror = () => resolve(false); 
                 img.src = url;
             });
         }
 
-        // --- NEW: SMART RANDOM HAND GENERATOR ---
         async function generateRandomHand() {
             const gallery = document.getElementById("imageGallery");
             gallery.innerHTML = "<p style='color: #48cae4; font-weight: bold;'>Shuffling the deck...</p>";
@@ -83,30 +81,22 @@
             let chosenMemes = [];
             let attempts = 0;
             
-            // Loop until we find 3 REAL images (or we try 150 times to prevent freezing)
             while (chosenMemes.length < 3 && attempts < 150) {
                 attempts++;
-                
-                // Guess a number between 1 and 100
                 let randomNum = Math.floor(Math.random() * 100) + 1; 
                 
                 if (!chosenMemes.includes(randomNum)) {
                     let url = `images/meme${randomNum}.jpeg`;
-                    let exists = await checkImage(url); // Ping GitHub!
-                    
-                    if (exists) {
-                        chosenMemes.push(randomNum); // We found a real one! Keep it!
-                    }
+                    let exists = await checkImage(url); 
+                    if (exists) chosenMemes.push(randomNum); 
                 }
             }
 
-            // Fallback just in case GitHub is acting up or no images exist
             if (chosenMemes.length === 0) {
                 gallery.innerHTML = "<p style='color: red;'>No images found! Upload meme1.jpeg to GitHub!</p>";
                 return;
             }
             
-            // Build the HTML for the 3 verified images
             let galleryHTML = "";
             for (let i = 0; i < chosenMemes.length; i++) {
                 galleryHTML += `<img src="images/meme${chosenMemes[i]}.jpeg" class="meme-option" onclick="pickImage(this.src)">`;
@@ -160,8 +150,6 @@
                     
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
-
-                    // Start hunting for the 3 real images!
                     await generateRandomHand();
                 }
 
@@ -172,6 +160,8 @@
 
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
+                    
+                    document.getElementById("matchWinnerScreen").style.display = "none";
                     
                     let voteScreen = document.getElementById("voteScreen");
                     voteScreen.style.display = "block";
