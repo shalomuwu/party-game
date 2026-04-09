@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meme Battle Controller</title>
+    <title>Meme Battle</title>
     <style>
         body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 50px; }
         input, button { padding: 15px; font-size: 20px; border-radius: 10px; margin: 10px; border: none; }
@@ -11,7 +11,10 @@
         .btn:active { transform: scale(0.95); }
         .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
-        .meme-option:active { border-color: #00b4d8; transform: scale(0.95); }
+        
+        /* Red and Blue Voting Buttons! */
+        #voteBtn1 { background: #ef233c; }
+        #voteBtn2 { background: #3a86ff; }
     </style>
 </head>
 <body>
@@ -25,7 +28,7 @@
 
     <div id="gameScreen" style="display: none;">
         <div class="player-name-display" id="playerNameDisplay"></div>
-        <h2 id="waitingMessage">Waiting for Host to start the game...</h2>
+        <h2 id="waitingMessage">Waiting for Host...</h2>
         
         <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
@@ -37,12 +40,16 @@
         <div id="captionScreen" style="display: none;">
             <h3>Write your best joke!</h3>
             <img id="captionImage" src="" style="width: 80%; max-width: 250px; border-radius: 10px; margin-bottom: 10px;">
-            <br>
-            <input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;">
-            <br>
-            <input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;">
-            <br>
-            <button class="btn" onclick="submitMeme()">FINISH</button>
+            <br><input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;">
+            <br><input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;">
+            <br><button class="btn" onclick="submitMeme()">FINISH</button>
+        </div>
+
+        <div id="voteScreen" style="display: none;">
+            <h3>Vote for the best meme!</h3>
+            <button id="voteBtn1" class="btn" onclick="castVote(this.innerText)">Player 1</button>
+            <br><br>
+            <button id="voteBtn2" class="btn" onclick="castVote(this.innerText)">Player 2</button>
         </div>
     </div>
 
@@ -77,26 +84,30 @@
                     document.getElementById("imageScreen").style.display = "block";
                 }
                 
-                // NEW: IF GODOT SAYS "CAPTION", SHOW THE TEXT BOXES!
                 if (message.startsWith("CAPTION,")) {
                     let parts = message.split(",");
-                    selectedImage = parts[1]; // Save the image URL
-
-                    // Hide Phase 1
+                    selectedImage = parts[1]; 
                     document.getElementById("waitingMessage").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
-
-                    // Show Phase 2
                     document.getElementById("captionScreen").style.display = "block";
-                    document.getElementById("captionImage").src = selectedImage; // Put the image on screen
+                    document.getElementById("captionImage").src = selectedImage; 
+                }
+
+                // NEW: IF GODOT SAYS "VOTE", SHOW THE RED & BLUE BUTTONS!
+                if (message.startsWith("VOTE_TIME,")) {
+                    let parts = message.split(",");
+                    document.getElementById("waitingMessage").style.display = "none";
+                    document.getElementById("captionScreen").style.display = "none";
+                    
+                    document.getElementById("voteScreen").style.display = "block";
+                    document.getElementById("voteBtn1").innerText = parts[1]; // Put Player 1's name on Red
+                    document.getElementById("voteBtn2").innerText = parts[2]; // Put Player 2's name on Blue
                 }
             };
 
             socket.onclose = function() {
                 alert("Disconnected from server.");
-                document.getElementById("setupScreen").style.display = "block";
-                document.getElementById("gameScreen").style.display = "none";
-                document.getElementById("connectBtn").innerText = "JOIN";
+                location.reload();
             };
         }
 
@@ -107,19 +118,21 @@
             document.getElementById("waitingMessage").style.display = "block";
         }
 
-        // NEW: SEND THE FINISHED JOKE TO GODOT
         function submitMeme() {
-            let topText = document.getElementById("topTextInput").value.trim();
-            let bottomText = document.getElementById("bottomTextInput").value.trim();
-            
-            // Clean up commas so we don't break the server data
-            topText = topText.replace(/,/g, ""); 
-            bottomText = bottomText.replace(/,/g, "");
-
+            let topText = document.getElementById("topTextInput").value.trim().replace(/,/g, "");
+            let bottomText = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
             socket.send("SUBMIT_MEME," + playerName + "," + topText + "," + bottomText + "," + selectedImage);
             
             document.getElementById("captionScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = "Joke submitted! Waiting for other players...";
+            document.getElementById("waitingMessage").style.display = "block";
+        }
+
+        // NEW: SEND THE VOTE BACK TO GODOT
+        function castVote(votedFor) {
+            socket.send("VOTE," + playerName + "," + votedFor);
+            document.getElementById("voteScreen").style.display = "none";
+            document.getElementById("waitingMessage").innerText = "Vote locked in!";
             document.getElementById("waitingMessage").style.display = "block";
         }
     </script>
