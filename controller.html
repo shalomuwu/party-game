@@ -63,7 +63,6 @@
         let selectedImage = "";
         let localTimer = null;
 
-        // --- NEW CLOCK SYSTEM ---
         function startLocalTimer(seconds) {
             clearInterval(localTimer);
             let time = seconds;
@@ -166,7 +165,6 @@
             };
         }
 
-        // --- BUTTON ACTIONS ---
         function pickImage(imgUrl) {
             selectedImage = imgUrl; 
             document.getElementById("imageScreen").style.display = "none";
