@@ -65,6 +65,15 @@
 
         let socket, playerName = "", selectedImage = "", localTimer = null;
 
+        // --- NEW: SMART MEMORY LOAD ---
+        // Instantly checks the phone's memory when the page loads!
+        window.onload = () => {
+            let savedName = localStorage.getItem("memePlayerToken");
+            if (savedName) {
+                document.getElementById("nameInput").value = savedName;
+            }
+        };
+
         function checkImage(url) {
             return new Promise((resolve) => {
                 let img = new Image();
@@ -123,13 +132,31 @@
 
         function connectToServer() {
             playerName = document.getElementById("nameInput").value.trim() || ("Player" + Math.floor(Math.random()*1000));
+            
+            // --- NEW: SAVE TOKEN ---
+            // Lock the name into the phone's memory so it never forgets!
+            localStorage.setItem("memePlayerToken", playerName);
+            
             document.getElementById("connectBtn").innerText = "CONNECTING...";
+            setupWebSocket();
+        }
+
+        // --- NEW: AUTO-RECONNECT ENGINE ---
+        function setupWebSocket() {
             socket = new WebSocket(SERVER_URL);
 
             socket.onopen = () => {
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
                 document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
+                document.getElementById("connectBtn").innerText = "JOIN"; // Reset button text safely
+                
+                // If it's a reconnection, clear any red warning text!
+                if (document.getElementById("waitingMessage").innerText.includes("Connection lost")) {
+                    document.getElementById("waitingMessage").innerText = "Reconnected! Waiting for next round...";
+                }
+
+                // Ping Godot so it puts us back on the VIP list immediately!
                 socket.send("JOIN," + playerName);
             };
 
@@ -148,9 +175,6 @@
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
                     
-                    // THE FIX: Auto-Attendance! Pings the new Godot scene so it knows who is playing!
-                    socket.send("JOIN," + playerName);
-                    
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
                     await generateRandomHand();
@@ -163,7 +187,6 @@
 
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
-                    
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     
                     let voteScreen = document.getElementById("voteScreen");
@@ -226,7 +249,22 @@
                     document.getElementById("waitingMessage").style.display = "block";
                 }
             };
-            socket.onclose = () => { alert("Disconnected."); location.reload(); };
+            
+            // --- NEW: INVISIBLE RECONNECTOR ---
+            socket.onclose = () => { 
+                clearInterval(localTimer);
+                
+                // Hide active menus so they can't click dead buttons
+                document.getElementById("imageScreen").style.display = "none";
+                document.getElementById("captionScreen").style.display = "none";
+                document.getElementById("voteScreen").style.display = "none";
+                
+                document.getElementById("waitingMessage").innerText = "⚠️ Connection lost! Reconnecting...";
+                document.getElementById("waitingMessage").style.display = "block";
+                
+                // Try to silently reconnect every 3 seconds!
+                setTimeout(setupWebSocket, 3000); 
+            };
         }
 
         function pickImage(imgUrl) {
