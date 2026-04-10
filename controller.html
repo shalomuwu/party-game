@@ -41,7 +41,7 @@
 
     <div id="gameScreen" style="display: none;">
         <div class="player-name-display" id="playerNameDisplay"></div>
-        <div id="waitingMessage">Waiting for Host...</div>
+        <div id="waitingMessage">Waiting for Host to start game...</div>
         
         <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
@@ -147,6 +147,9 @@
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
+                    
+                    // THE FIX: Auto-Attendance! Pings the new Godot scene so it knows who is playing!
+                    socket.send("JOIN," + playerName);
                     
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
