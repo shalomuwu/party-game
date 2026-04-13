@@ -5,18 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meme Battle</title>
     <style>
-        body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 30px; }
+        * { box-sizing: border-box; }
+        body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 30px; padding: 0 10px; }
         input, button { padding: 15px; font-size: 20px; border-radius: 10px; margin: 10px; border: none; }
         .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .btn:active { transform: scale(0.95); }
-        .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
-        
+        .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 10px; }
+
+        /* ---- TIMER BAR ---- */
+        #timerContainer {
+            width: 90%;
+            max-width: 400px;
+            margin: 0 auto 16px auto;
+            display: none;
+        }
+        #timerLabel {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffd166;
+            margin-bottom: 4px;
+        }
+        #timerBarTrack {
+            background: #0d1b2a;
+            border-radius: 999px;
+            height: 18px;
+            border: 2px solid #00b4d8;
+            overflow: hidden;
+        }
+        #timerBarFill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #00b4d8, #48cae4);
+            transition: width 1s linear, background 1s;
+            width: 100%;
+        }
+        /* Turn red when under 10 seconds */
+        #timerBarFill.urgent {
+            background: linear-gradient(90deg, #ef233c, #ff6b6b);
+        }
+
         #imageGallery { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 20px; }
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; transition: 0.2s;}
         .meme-option:active { border-color: #00b4d8; transform: scale(0.95); }
         
-        #voteBtn1 { background: #ef233c; }
-        #voteBtn2 { background: #3a86ff; }
         #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px;}
         
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
@@ -25,7 +56,7 @@
             position: absolute; width: 100%; text-align: center; color: white; 
             font-family: 'Impact', sans-serif; font-size: 26px; text-transform: uppercase; 
             text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; 
-            left: 0; padding: 0 10px; box-sizing: border-box; word-wrap: break-word; pointer-events: none;
+            left: 0; padding: 0 10px; word-wrap: break-word; pointer-events: none;
         }
         .meme-top { top: 10px; }
         .meme-bottom { bottom: 10px; }
@@ -41,6 +72,15 @@
 
     <div id="gameScreen" style="display: none;">
         <div class="player-name-display" id="playerNameDisplay"></div>
+
+        <!-- TIMER BAR — shown during caption & voting phases -->
+        <div id="timerContainer">
+            <div id="timerLabel">⏳ 60s</div>
+            <div id="timerBarTrack">
+                <div id="timerBarFill"></div>
+            </div>
+        </div>
+
         <div id="waitingMessage">Waiting for Host to start game...</div>
         
         <div id="imageScreen" style="display: none;">
@@ -63,22 +103,56 @@
     <script>
         const SERVER_URL = "wss://game.shalomuwu.com";
 
-        let socket, playerName = "", selectedImage = "", localTimer = null;
+        let socket, playerName = "", selectedImage = "";
+        let timerInterval = null;
+        let timerTotal = 60; // track the starting total for the bar
 
-        // --- NEW: SMART MEMORY LOAD ---
-        // Instantly checks the phone's memory when the page loads!
         window.onload = () => {
             let savedName = localStorage.getItem("memePlayerToken");
-            if (savedName) {
-                document.getElementById("nameInput").value = savedName;
-            }
+            if (savedName) document.getElementById("nameInput").value = savedName;
         };
 
+        // ---- TIMER FUNCTIONS ----
+        function startTimer(seconds) {
+            clearInterval(timerInterval);
+            timerTotal = seconds;
+            let time = seconds;
+
+            const container = document.getElementById("timerContainer");
+            const label = document.getElementById("timerLabel");
+            const fill = document.getElementById("timerBarFill");
+
+            container.style.display = "block";
+            fill.classList.remove("urgent");
+            fill.style.width = "100%";
+            label.innerText = "⏳ " + time + "s";
+
+            timerInterval = setInterval(() => {
+                time--;
+                if (time <= 0) {
+                    clearInterval(timerInterval);
+                    time = 0;
+                    label.innerText = "⏳ Time's up!";
+                    fill.style.width = "0%";
+                    return;
+                }
+                label.innerText = "⏳ " + time + "s";
+                fill.style.width = ((time / timerTotal) * 100) + "%";
+                if (time <= 10) fill.classList.add("urgent");
+            }, 1000);
+        }
+
+        function hideTimer() {
+            clearInterval(timerInterval);
+            document.getElementById("timerContainer").style.display = "none";
+        }
+
+        // ---- WEBSOCKET ----
         function checkImage(url) {
             return new Promise((resolve) => {
                 let img = new Image();
-                img.onload = () => resolve(true);  
-                img.onerror = () => resolve(false); 
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
                 img.src = url;
             });
         }
@@ -92,12 +166,11 @@
             
             while (chosenMemes.length < 3 && attempts < 150) {
                 attempts++;
-                let randomNum = Math.floor(Math.random() * 100) + 1; 
-                
+                let randomNum = Math.floor(Math.random() * 100) + 1;
                 if (!chosenMemes.includes(randomNum)) {
                     let url = `images/meme${randomNum}.jpeg`;
-                    let exists = await checkImage(url); 
-                    if (exists) chosenMemes.push(randomNum); 
+                    let exists = await checkImage(url);
+                    if (exists) chosenMemes.push(randomNum);
                 }
             }
 
@@ -105,7 +178,7 @@
                 gallery.innerHTML = "<p style='color: red;'>No images found! Upload meme1.jpeg to GitHub!</p>";
                 return;
             }
-            
+
             let galleryHTML = "";
             for (let i = 0; i < chosenMemes.length; i++) {
                 galleryHTML += `<img src="images/meme${chosenMemes[i]}.jpeg" class="meme-option" onclick="pickImage(this.src)">`;
@@ -113,35 +186,13 @@
             gallery.innerHTML = galleryHTML;
         }
 
-        function startLocalTimer(seconds) {
-            clearInterval(localTimer);
-            let time = seconds;
-            let display = document.getElementById("waitingMessage");
-            display.style.display = "block";
-            
-            localTimer = setInterval(() => {
-                if (time <= 0) {
-                    clearInterval(localTimer);
-                    display.innerText = "⏳ Time's up! Waiting for server...";
-                } else {
-                    display.innerText = "⏳ Time Left: " + time + "s";
-                    time--;
-                }
-            }, 1000);
-        }
-
         function connectToServer() {
-            playerName = document.getElementById("nameInput").value.trim() || ("Player" + Math.floor(Math.random()*1000));
-            
-            // --- NEW: SAVE TOKEN ---
-            // Lock the name into the phone's memory so it never forgets!
+            playerName = document.getElementById("nameInput").value.trim() || ("Player" + Math.floor(Math.random() * 1000));
             localStorage.setItem("memePlayerToken", playerName);
-            
             document.getElementById("connectBtn").innerText = "CONNECTING...";
             setupWebSocket();
         }
 
-        // --- NEW: AUTO-RECONNECT ENGINE ---
         function setupWebSocket() {
             socket = new WebSocket(SERVER_URL);
 
@@ -149,14 +200,12 @@
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
                 document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
-                document.getElementById("connectBtn").innerText = "JOIN"; // Reset button text safely
-                
-                // If it's a reconnection, clear any red warning text!
+                document.getElementById("connectBtn").innerText = "JOIN";
+
                 if (document.getElementById("waitingMessage").innerText.includes("Connection lost")) {
                     document.getElementById("waitingMessage").innerText = "Reconnected! Waiting for next round...";
                 }
 
-                // Ping Godot so it puts us back on the VIP list immediately!
                 socket.send("JOIN," + playerName);
             };
 
@@ -174,9 +223,10 @@
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
-                    
+                    document.getElementById("waitingMessage").style.display = "none";
+
                     document.getElementById("imageScreen").style.display = "block";
-                    startLocalTimer(seconds);
+                    startTimer(seconds);
                     await generateRandomHand();
                 }
 
@@ -188,10 +238,10 @@
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
                     document.getElementById("matchWinnerScreen").style.display = "none";
-                    
+                    document.getElementById("waitingMessage").style.display = "none";
+
                     let voteScreen = document.getElementById("voteScreen");
                     voteScreen.style.display = "block";
-                    
                     voteScreen.innerHTML = `
                         <h3>Vote for the best meme!</h3>
                         <div class="meme-display">
@@ -208,11 +258,11 @@
                         </div>
                         <br><button class="btn" style="background:#3a86ff; width:80%; margin-top:0;" onclick="castVote('${p2}')">Vote for ${p2}</button>
                     `;
-                    startLocalTimer(seconds);
+                    startTimer(seconds);
                 }
 
                 if (command === "MATCH_WINNER") {
-                    clearInterval(localTimer); 
+                    hideTimer();
                     let winner = parts[1], imgUrl = parts[2], points = parts[3], topT = parts[4], botT = parts[5];
                     
                     document.getElementById("voteScreen").style.display = "none";
@@ -237,41 +287,36 @@
                 }
 
                 if (command === "ROUND_SUMMARY") {
+                    hideTimer();
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("waitingMessage").innerText = "Round over! Tallying scores...";
                     document.getElementById("waitingMessage").style.display = "block";
                 }
 
                 if (command === "GAME_OVER") {
-                    clearInterval(localTimer);
+                    hideTimer();
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("waitingMessage").innerText = "🏆 ULTIMATE WINNER: " + parts[1] + " 🏆";
                     document.getElementById("waitingMessage").style.display = "block";
                 }
             };
             
-            // --- NEW: INVISIBLE RECONNECTOR ---
             socket.onclose = () => { 
-                clearInterval(localTimer);
-                
-                // Hide active menus so they can't click dead buttons
+                hideTimer();
                 document.getElementById("imageScreen").style.display = "none";
                 document.getElementById("captionScreen").style.display = "none";
                 document.getElementById("voteScreen").style.display = "none";
-                
                 document.getElementById("waitingMessage").innerText = "⚠️ Connection lost! Reconnecting...";
                 document.getElementById("waitingMessage").style.display = "block";
-                
-                // Try to silently reconnect every 3 seconds!
-                setTimeout(setupWebSocket, 3000); 
+                setTimeout(setupWebSocket, 3000);
             };
         }
 
         function pickImage(imgUrl) {
-            selectedImage = imgUrl; 
+            selectedImage = imgUrl;
             document.getElementById("imageScreen").style.display = "none";
             document.getElementById("captionScreen").style.display = "block";
-            document.getElementById("captionImage").src = selectedImage; 
+            document.getElementById("captionImage").src = selectedImage;
             socket.send("PICKED," + playerName + "," + imgUrl);
         }
 
@@ -280,13 +325,15 @@
             let b = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
             socket.send("SUBMIT_MEME," + playerName + "," + t + "," + b + "," + selectedImage);
             document.getElementById("captionScreen").style.display = "none";
-            document.getElementById("waitingMessage").innerText = "Submitted! Waiting for clock...";
+            document.getElementById("waitingMessage").innerText = "Submitted! Waiting for others...";
             document.getElementById("waitingMessage").style.display = "block";
+            // Keep timer visible after submitting so player knows how long to wait
         }
 
         function castVote(votedFor) {
             socket.send("VOTE," + playerName + "," + votedFor);
             document.getElementById("voteScreen").style.display = "none";
+            hideTimer();
             document.getElementById("waitingMessage").innerText = "Vote locked in!";
             document.getElementById("waitingMessage").style.display = "block";
         }
