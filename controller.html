@@ -40,9 +40,7 @@
         
         <div id="imageScreen" style="display: none;">
             <h3>Pick your template!</h3>
-            <img src="https://placehold.co/300x300/444444/FFF.png?text=Meme+1" class="meme-option" onclick="pickImage(this.src)">
-            <img src="https://placehold.co/300x300/666666/FFF.png?text=Meme+2" class="meme-option" onclick="pickImage(this.src)">
-            <img src="https://placehold.co/300x300/888888/FFF.png?text=Meme+3" class="meme-option" onclick="pickImage(this.src)">
+            <div id="imageChoices"></div>
         </div>
 
         <div id="captionScreen" style="display: none;">
@@ -60,10 +58,35 @@
     <script>
         const SERVER_URL = "wss://game.shalomuwu.com";
 
+        // The real meme images hosted next to this page on GitHub Pages.
+        // IMAGE_COUNT must match how many memeN.jpeg files are in the repo!
+        const IMAGE_BASE_URL = "https://shalomuwu.github.io/party-game/images/meme";
+        const IMAGE_EXT = ".jpeg";
+        const IMAGE_COUNT = 10;
+
         let socket, playerName = "", selectedImage = "", localTimer = null;
         // The two names currently up for voting. Buttons vote by INDEX
         // (0 or 1) so names with apostrophes or quotes can't break the button.
         let currentMatchup = ["", ""];
+
+        // Fills the template picker with `count` different random images.
+        // Called on every NEW_ROUND so players get fresh choices each time.
+        function showRandomTemplates(count) {
+            let choices = [];
+            while (choices.length < count) {
+                let n = Math.floor(Math.random() * IMAGE_COUNT) + 1;
+                if (!choices.includes(n)) choices.push(n);
+            }
+            let box = document.getElementById("imageChoices");
+            box.innerHTML = "";
+            choices.forEach(n => {
+                let img = document.createElement("img");
+                img.src = IMAGE_BASE_URL + n + IMAGE_EXT;
+                img.className = "meme-option";
+                img.onclick = () => pickImage(img.src);
+                box.appendChild(img);
+            });
+        }
 
         // Builds a meme card safely: caption text goes in via textContent,
         // so players can't break the screen by typing < or " in their jokes.
@@ -137,7 +160,8 @@
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
-                    
+
+                    showRandomTemplates(3);
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
                 }
