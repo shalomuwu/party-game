@@ -65,9 +65,9 @@
         const IMAGE_COUNT = 10;
 
         let socket, playerName = "", selectedImage = "", localTimer = null;
-        // The two names currently up for voting. Buttons vote by INDEX
-        // (0 or 1) so names with apostrophes or quotes can't break the button.
-        let currentMatchup = ["", ""];
+        // The names currently up for voting (2 or 3). Buttons vote by INDEX
+        // so names with apostrophes or quotes can't break the button.
+        let currentMatchup = [];
 
         // Fills the template picker with `count` different random images.
         // Called on every NEW_ROUND so players get fresh choices each time.
@@ -168,9 +168,10 @@
 
                 if (command === "VOTE_TIME") {
                     let seconds = parseInt(parts[1]);
-                    // Godot now sends: Command, Time, Player1, Top1, Bot1, Img1, Player2, Top2, Bot2, Img2
-                    let p1 = parts[2], t1 = parts[3], b1 = parts[4], i1 = parts[5];
-                    let p2 = parts[6], t2 = parts[7], b2 = parts[8], i2 = parts[9];
+                    // Format: VOTE_TIME,seconds,count, then per meme: name,top,bottom,img
+                    // (2 memes normally, 3 memes when the host runs 12+ players)
+                    let count = parseInt(parts[2]);
+                    const colors = ["#ef233c", "#3a86ff", "#ffbe0b"];
 
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
@@ -178,15 +179,16 @@
                     let voteScreen = document.getElementById("voteScreen");
                     voteScreen.style.display = "block";
 
-                    // Remember the names so castVote(0) / castVote(1) can send them
-                    currentMatchup = [p1, p2];
-
+                    currentMatchup = [];
                     voteScreen.innerHTML = "<h3>Vote for the best meme!</h3>";
-                    voteScreen.appendChild(makeMemeCard(i1, t1, b1));
-                    voteScreen.appendChild(makeVoteButton(p1, "#ef233c", 0));
-                    voteScreen.appendChild(document.createElement("br"));
-                    voteScreen.appendChild(makeMemeCard(i2, t2, b2));
-                    voteScreen.appendChild(makeVoteButton(p2, "#3a86ff", 1));
+                    for (let k = 0; k < count; k++) {
+                        let base = 3 + k * 4;
+                        let name = parts[base], top = parts[base + 1], bottom = parts[base + 2], img = parts[base + 3];
+                        currentMatchup.push(name);
+                        if (k > 0) voteScreen.appendChild(document.createElement("br"));
+                        voteScreen.appendChild(makeMemeCard(img, top, bottom));
+                        voteScreen.appendChild(makeVoteButton(name, colors[k % colors.length], k));
+                    }
                     startLocalTimer(seconds);
                 }
 
