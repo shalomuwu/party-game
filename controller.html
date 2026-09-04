@@ -5,21 +5,79 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meme Battle</title>
     <style>
-        body { background: #1a2a3a; color: white; font-family: sans-serif; text-align: center; margin-top: 30px; }
-        input, button { padding: 15px; font-size: 20px; border-radius: 10px; margin: 10px; border: none; }
-        .btn { background: #00b4d8; color: white; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
-        .btn:active { transform: scale(0.95); }
-        .player-name-display { font-size: 24px; color: #48cae4; margin-bottom: 20px; }
+        :root {
+            --bg: #26443a; --panel: #f2e8c9; --frame: #4a3527;
+            --ink: #2e4a3c; --cream: #f2e8c9; --gold: #c9a227; --terra: #c1663e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: radial-gradient(circle at 50% 15%, #2d5044 0%, var(--bg) 55%, #1b3129 100%);
+            color: var(--cream); font-family: Georgia, 'Times New Roman', serif;
+            text-align: center; margin: 0; padding: 14px 10px 40px; min-height: 100vh;
+        }
+        h2.title { font-size: 34px; letter-spacing: 2px; margin: 14px 0 10px; text-shadow: 0 2px 0 #14241e; }
+        h3 { letter-spacing: 1px; }
+        input, button { font-family: Georgia, serif; }
+        input {
+            padding: 14px; font-size: 20px; border-radius: 10px; width: 92%; max-width: 420px;
+            background: #1d352c; color: var(--cream); border: 2px solid var(--cream); outline: none;
+        }
+        input::placeholder { color: #b9c9bd; }
+        .btn {
+            padding: 15px; font-size: 20px; border-radius: 12px; margin: 10px; border: none;
+            background: #00b4d8; color: white; cursor: pointer; font-weight: bold;
+            width: 85%; max-width: 340px; letter-spacing: 1px;
+        }
+        .btn:active { transform: scale(0.96); }
+        .panel {
+            background: var(--panel); color: var(--ink); border: 6px solid var(--frame);
+            border-radius: 14px; box-shadow: 0 8px 22px rgba(0,0,0,.5), inset 0 0 0 2px #d8cbaa;
+            padding: 14px 12px 18px; max-width: 440px; margin: 14px auto 0;
+        }
+        .panel h3 { margin: 4px 0 10px; color: var(--ink); }
+        .belt-btn {
+            background: linear-gradient(#4d3320, #3a2517); color: var(--cream);
+            border: 4px solid var(--gold); border-radius: 24px; padding: 16px 34px;
+            font-size: 22px; font-weight: bold; letter-spacing: 2px; cursor: pointer;
+            box-shadow: 0 6px 16px rgba(0,0,0,.5), inset 0 0 0 2px #6b4a2e;
+        }
+        .belt-btn:active { transform: scale(0.96); }
+
+        /* ── mask designer ── */
+        #maskRow { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: nowrap; }
+        .mask-option { width: 52px; cursor: pointer; border-radius: 10px; padding: 3px; border: 3px solid transparent; }
+        .mask-option.selected { border-color: var(--gold); background: rgba(201,162,39,.15); }
+        #maskPreview svg { filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+        .cfg-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #1d352c; color: var(--cream); border-radius: 10px;
+            padding: 8px 12px; margin: 8px auto; max-width: 320px;
+        }
+        .cfg-row span { font-size: 17px; letter-spacing: 1px; }
+        .swatch { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--cream); cursor: pointer; }
+        #patternRow { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
+        .pattern-chip {
+            padding: 7px 10px; font-size: 13px; border-radius: 9px; cursor: pointer;
+            background: #1d352c; color: var(--cream); border: 2px solid #3c5a4c; letter-spacing: 1px;
+        }
+        .pattern-chip.selected { border-color: var(--gold); color: var(--gold); }
+        #palette {
+            display: none; position: fixed; left: 50%; transform: translateX(-50%);
+            bottom: 24px; background: #fff; border-radius: 12px; padding: 10px;
+            grid-template-columns: repeat(6, 34px); gap: 7px; z-index: 50;
+            box-shadow: 0 8px 26px rgba(0,0,0,.6);
+        }
+        #palette div { width: 34px; height: 34px; border-radius: 6px; cursor: pointer; border: 2px solid #ddd; }
+        .player-name-display { font-size: 24px; color: #7fd8c2; margin-bottom: 14px; letter-spacing: 1px; }
+        #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px; letter-spacing: 1px; }
+
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
-        #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px;}
-        
-        /* NEW: CSS to make the memes look real on the phone! */
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
         .meme-display img { width: 100%; border-radius: 10px; border: 3px solid #00b4d8; display: block; }
-        .meme-text { 
-            position: absolute; width: 100%; text-align: center; color: white; 
-            font-family: 'Impact', sans-serif; font-size: 26px; text-transform: uppercase; 
-            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; 
+        .meme-text {
+            position: absolute; width: 100%; text-align: center; color: white;
+            font-family: 'Impact', sans-serif; font-size: 26px; text-transform: uppercase;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
             left: 0; padding: 0 10px; box-sizing: border-box; word-wrap: break-word; pointer-events: none;
         }
         .meme-top { top: 10px; }
@@ -29,9 +87,21 @@
 <body>
 
     <div id="setupScreen">
-        <h2>JOIN GAME</h2>
-        <input type="text" id="nameInput" placeholder="ENTER NICKNAME" maxlength="12">
-        <br><button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
+        <h2 class="title">JOIN THE GAME</h2>
+        <input type="text" id="nameInput" placeholder="YOUR NICKNAME" maxlength="12">
+        <div class="panel">
+            <h3>DESIGN YOUR LUCHADOR</h3>
+            <h3 style="font-size:15px; opacity:.85;">SELECT MASK</h3>
+            <div id="maskRow"></div>
+            <div id="maskPreview" style="margin: 6px 0 2px;"></div>
+            <div class="cfg-row"><span>BASE COLOR</span><div class="swatch" id="sw-base" onclick="openPalette('base')"></div></div>
+            <div class="cfg-row"><span>OUTLINE</span><div class="swatch" id="sw-outline" onclick="openPalette('outline')"></div></div>
+            <div class="cfg-row"><span>ACCENT</span><div class="swatch" id="sw-accent" onclick="openPalette('accent')"></div></div>
+            <h3 style="font-size:15px; opacity:.85; margin-top:12px;">PATTERN</h3>
+            <div id="patternRow"></div>
+        </div>
+        <button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
+        <div id="palette"></div>
     </div>
 
     <div id="gameScreen" style="display: none;">
@@ -117,6 +187,118 @@
             return btn;
         }
 
+        // ── Luchador mask designer ──
+        const SHAPE_PRESETS = [
+            { base: "#2e7d32", outline: "#f2e8c9", accent: "#e0b23e" },
+            { base: "#1e5aa8", outline: "#f2e8c9", accent: "#dfe6ee" },
+            { base: "#c62828", outline: "#f2e8c9", accent: "#ffd600" },
+            { base: "#f9c80e", outline: "#f2e8c9", accent: "#1a1a1a" },
+            { base: "#6a4c93", outline: "#f2e8c9", accent: "#40bdbd" },
+        ];
+        const PATTERNS = ["SOLID", "STRIPES", "DIAMOND", "FLAMES", "SPLIT"];
+        const PALETTE = ["#e53935", "#ef6c00", "#f9c80e", "#cddc39", "#2e7d32", "#00897b", "#00acc1", "#1e5aa8", "#6a4c93", "#ad1457", "#f2e8c9", "#d9a441", "#9e9e9e", "#4a3527", "#101010", "#ffffff", "#7cb342", "#5d4037"];
+        let maskCfg = { shape: 0, base: "#2e7d32", outline: "#f2e8c9", accent: "#e0b23e", pattern: 0 };
+        let paletteTarget = "base";
+        let svgId = 0;
+
+        const SHAPE_PATHS = [
+            "M50 4 C78 4 92 28 92 58 C92 92 72 116 50 116 C28 116 8 92 8 58 C8 28 22 4 50 4 Z",
+            "M50 3 L87 15 C87 55 76 100 50 117 C24 100 13 55 13 15 Z",
+            "M30 5 L70 5 L91 38 L79 112 L21 112 L9 38 Z",
+            "M50 2 L90 52 L50 118 L10 52 Z",
+            "M20 6 L80 6 C89 6 93 12 93 22 L93 92 C93 110 78 115 50 115 C22 115 7 110 7 92 L7 22 C7 12 11 6 20 6 Z"
+        ];
+
+        function patternSVG(cfg) {
+            const a = cfg.accent;
+            switch (cfg.pattern % 5) {
+                case 1: return `<g fill="${a}"><rect x="16" y="0" width="10" height="120"/><rect x="45" y="0" width="10" height="120"/><rect x="74" y="0" width="10" height="120"/></g>`;
+                case 2: return `<g fill="${a}"><path d="M50 6 L61 21 L50 36 L39 21 Z"/><path d="M50 58 L63 75 L50 92 L37 75 Z"/><path d="M21 42 L30 53 L21 64 L12 53 Z"/><path d="M79 42 L88 53 L79 64 L70 53 Z"/></g>`;
+                case 3: return `<path fill="${a}" d="M8 34 L22 52 L36 30 L50 54 L64 30 L78 52 L92 34 L92 0 L8 0 Z"/>`;
+                case 4: return `<rect x="0" y="0" width="50" height="120" fill="${a}"/>`;
+                default: return "";
+            }
+        }
+
+        function maskSVG(cfg, px) {
+            const p = SHAPE_PATHS[cfg.shape % 5];
+            const id = "mc" + (++svgId);
+            return `<svg viewBox="0 0 100 120" width="${px}" height="${Math.round(px * 1.2)}" xmlns="http://www.w3.org/2000/svg">`
+                + `<defs><clipPath id="${id}"><path d="${p}"/></clipPath></defs>`
+                + `<path d="${p}" fill="${cfg.base}"/>`
+                + `<g clip-path="url(#${id})">${patternSVG(cfg)}</g>`
+                + `<ellipse cx="33" cy="48" rx="12.5" ry="8.5" fill="#101010" stroke="${cfg.accent}" stroke-width="2.5" transform="rotate(-14 33 48)"/>`
+                + `<ellipse cx="67" cy="48" rx="12.5" ry="8.5" fill="#101010" stroke="${cfg.accent}" stroke-width="2.5" transform="rotate(14 67 48)"/>`
+                + `<ellipse cx="50" cy="93" rx="9" ry="6" fill="#101010" stroke="${cfg.accent}" stroke-width="2"/>`
+                + `<path d="${p}" fill="none" stroke="${cfg.outline}" stroke-width="4.5"/>`
+                + `</svg>`;
+        }
+
+        function refreshDesigner() {
+            const row = document.getElementById("maskRow");
+            row.innerHTML = "";
+            for (let s = 0; s < 5; s++) {
+                const holder = document.createElement("div");
+                holder.className = "mask-option" + (maskCfg.shape === s ? " selected" : "");
+                holder.innerHTML = maskSVG({ shape: s, base: SHAPE_PRESETS[s].base, outline: SHAPE_PRESETS[s].outline, accent: SHAPE_PRESETS[s].accent, pattern: 0 }, 42);
+                holder.onclick = () => {
+                    maskCfg.shape = s;
+                    maskCfg.base = SHAPE_PRESETS[s].base;
+                    maskCfg.outline = SHAPE_PRESETS[s].outline;
+                    maskCfg.accent = SHAPE_PRESETS[s].accent;
+                    refreshDesigner();
+                };
+                row.appendChild(holder);
+            }
+            const prow = document.getElementById("patternRow");
+            prow.innerHTML = "";
+            PATTERNS.forEach((name, p) => {
+                const chip = document.createElement("div");
+                chip.className = "pattern-chip" + (maskCfg.pattern === p ? " selected" : "");
+                chip.textContent = name;
+                chip.onclick = () => { maskCfg.pattern = p; refreshDesigner(); };
+                prow.appendChild(chip);
+            });
+            document.getElementById("maskPreview").innerHTML = maskSVG(maskCfg, 130);
+            document.getElementById("sw-base").style.background = maskCfg.base;
+            document.getElementById("sw-outline").style.background = maskCfg.outline;
+            document.getElementById("sw-accent").style.background = maskCfg.accent;
+        }
+
+        function openPalette(target) {
+            paletteTarget = target;
+            const pal = document.getElementById("palette");
+            pal.innerHTML = "";
+            PALETTE.forEach(c => {
+                const d = document.createElement("div");
+                d.style.background = c;
+                d.onclick = (e) => {
+                    e.stopPropagation();
+                    maskCfg[paletteTarget] = c;
+                    pal.style.display = "none";
+                    refreshDesigner();
+                };
+                pal.appendChild(d);
+            });
+            pal.style.display = "grid";
+        }
+
+        document.addEventListener("click", (e) => {
+            const pal = document.getElementById("palette");
+            if (pal.style.display === "grid" && !pal.contains(e.target) && !e.target.classList.contains("swatch")) {
+                pal.style.display = "none";
+            }
+        });
+
+        // restore this player's last design and nickname
+        try {
+            const saved = JSON.parse(localStorage.getItem("luchador") || "null");
+            if (saved && saved.base && SHAPE_PATHS[saved.shape % 5]) maskCfg = saved;
+            const savedName = localStorage.getItem("luchador_name");
+            if (savedName) document.getElementById("nameInput").value = savedName;
+        } catch (e) {}
+        refreshDesigner();
+
         function startLocalTimer(seconds) {
             clearInterval(localTimer);
             let time = seconds;
@@ -143,7 +325,13 @@
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
                 document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
-                socket.send("JOIN," + playerName);
+                // Send the mask design along with the name so the host's lobby
+                // (and future screens) can draw THIS player's actual mask
+                socket.send(["JOIN", playerName, maskCfg.shape, maskCfg.base, maskCfg.outline, maskCfg.accent, maskCfg.pattern].join(","));
+                try {
+                    localStorage.setItem("luchador", JSON.stringify(maskCfg));
+                    localStorage.setItem("luchador_name", playerName);
+                } catch (e) {}
             };
 
             socket.onmessage = async (event) => {
