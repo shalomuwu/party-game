@@ -148,6 +148,8 @@
         // Other players' luchador masks, sent by the host as MASKOF messages
         // (name -> png data URL). Used wherever we show someone's name.
         let maskByName = {};
+        // true once this phone sent its (first) meme for the current round
+        let mySubmitted = false;
 
         // Small mask avatar for a player name; updates itself later if the
         // mask arrives after the screen was already built.
@@ -415,6 +417,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     document.getElementById("topTextInput").value = "";
                     document.getElementById("bottomTextInput").value = "";
                     selectedImage = "";
+                    mySubmitted = false;
                     document.getElementById("notice").style.display = "none";
                     
                     document.getElementById("matchWinnerScreen").style.display = "none";
@@ -466,6 +469,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     notice.style.display = "block";
                     if (who === playerName) {
                         // back to the picker for a SECOND meme
+                        mySubmitted = false;
                         selectedImage = "";
                         document.getElementById("topTextInput").value = "";
                         document.getElementById("bottomTextInput").value = "";
@@ -473,8 +477,15 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         showRandomTemplates(3);
                         document.getElementById("imageScreen").style.display = "block";
                     } else {
-                        document.getElementById("imageScreen").style.display = "none";
-                        document.getElementById("captionScreen").style.display = "none";
+                        // everyone else keeps their picker/caption screen —
+                        // they still need to make their OWN first meme!
+                        if (!mySubmitted
+                            && document.getElementById("imageScreen").style.display !== "block"
+                            && document.getElementById("captionScreen").style.display !== "block"
+                            && document.getElementById("voteScreen").style.display !== "block") {
+                            document.getElementById("imageScreen").style.display = "block";
+                            showRandomTemplates(3);
+                        }
                         notice.innerText = "⏳ " + who + " has to make a second meme...";
                     }
                     startLocalTimer(seconds);
@@ -576,6 +587,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         function submitMeme() {
             let t = document.getElementById("topTextInput").value.trim().replace(/,/g, "");
             let b = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
+            mySubmitted = true;
             socket.send("SUBMIT_MEME," + playerName + "," + t + "," + b + "," + selectedImage);
             document.getElementById("captionScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = "Submitted! Waiting for clock...";
