@@ -23,7 +23,7 @@
             padding: 14px; font-size: 20px; border-radius: 10px; width: 92%; max-width: 420px;
             background: #5f3220; color: var(--cream); border: 2px solid var(--cream); outline: none;
         }
-        input::placeholder { color: #b9c9bd; }
+        input::placeholder { color: #e5d5b8; }
         .btn {
             padding: 15px; font-size: 20px; border-radius: 12px; margin: 10px; border: none;
             background: #00b4d8; color: white; cursor: pointer; font-weight: bold;
@@ -43,6 +43,7 @@
             box-shadow: 0 6px 16px rgba(0,0,0,.5), inset 0 0 0 2px #6b4a2e;
         }
         .belt-btn:active { transform: scale(0.96); }
+        .lang-btn { position: fixed; top: 12px; right: 12px; z-index: 60; padding: 10px 18px; font-size: 18px; font-weight: bold; border-radius: 10px; cursor: pointer; background: #5f3220; color: var(--cream); border: 3px solid #c9a227; font-family: Georgia, serif; }
 
         /* ── mask designer ── */
         #maskRow { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: nowrap; }
@@ -97,17 +98,18 @@
 <body>
 
     <div id="setupScreen">
-        <h2 class="title">JOIN THE GAME</h2>
-        <input type="text" id="nameInput" placeholder="YOUR NICKNAME" maxlength="12">
+        <h2 class="title" id="joinTitle">JOIN THE GAME</h2>
+        <button id="langBtn" class="lang-btn" onclick="toggleLang()">EN</button>
+        <input type="text" id="nameInput" placeholder="YOUR NICKNAME" maxlength="24">
         <div class="panel">
-            <h3>DESIGN YOUR LUCHADOR</h3>
-            <h3 style="font-size:15px; opacity:.85;">SELECT MASK</h3>
+            <h3 id="designTitle">DESIGN YOUR LUCHADOR</h3>
+            <h3 id="selectMaskTitle" style="font-size:15px; opacity:.85;">SELECT MASK</h3>
             <div id="maskRow"></div>
             <div id="maskPreview" style="margin: 6px 0 2px;"></div>
-            <div class="cfg-row"><span>BASE COLOR</span><div class="swatch" id="sw-c1" onclick="openPalette(0)"></div></div>
-            <div class="cfg-row"><span>ACCENT 1</span><div class="swatch" id="sw-c2" onclick="openPalette(1)"></div></div>
-            <div class="cfg-row"><span>ACCENT 2</span><div class="swatch" id="sw-c3" onclick="openPalette(2)"></div></div>
-            <div class="cfg-row"><span>ACCENT 3</span><div class="swatch" id="sw-c4" onclick="openPalette(3)"></div></div>
+            <div class="cfg-row"><span id="lblBase">BASE COLOR</span><div class="swatch" id="sw-c1" onclick="openPalette(0)"></div></div>
+            <div class="cfg-row"><span id="lblAcc1">ACCENT 1</span><div class="swatch" id="sw-c2" onclick="openPalette(1)"></div></div>
+            <div class="cfg-row"><span id="lblAcc2">ACCENT 2</span><div class="swatch" id="sw-c3" onclick="openPalette(2)"></div></div>
+            <div class="cfg-row"><span id="lblAcc3">ACCENT 3</span><div class="swatch" id="sw-c4" onclick="openPalette(3)"></div></div>
         </div>
         <button id="connectBtn" class="btn" onclick="connectToServer()">JOIN</button>
         <div id="palette"></div>
@@ -117,18 +119,18 @@
         <div class="player-name-display" id="playerNameDisplay"></div>
         <div id="notice" style="display: none;"></div>
         <div id="waitingMessage">Waiting for Host...</div>
-        
+
         <div id="imageScreen" style="display: none;">
-            <h3>Pick your template!</h3>
+            <h3 id="pickTitle">Pick your template!</h3>
             <div id="imageChoices"></div>
         </div>
 
         <div id="captionScreen" style="display: none;">
-            <h3>Write your best joke!</h3>
+            <h3 id="writeTitle">Write your best joke!</h3>
             <img id="captionImage" src="" style="width: 80%; max-width: 250px; border-radius: 10px; margin-bottom: 10px;">
             <br><input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;">
             <br><input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;">
-            <br><button class="btn" onclick="submitMeme()">FINISH</button>
+            <br><button id="finishBtn" class="btn" onclick="submitMeme()">FINISH</button>
         </div>
 
         <div id="voteScreen" style="display: none;"></div>
@@ -213,7 +215,7 @@
             btn.className = "btn";
             btn.style.background = color;
             btn.style.marginTop = "0";
-            btn.textContent = "Vote for " + name;
+            btn.textContent = T("vote_for", name);
             btn.onclick = () => castVote(index);
             return btn;
         }
@@ -372,6 +374,81 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             });
         }
 
+        // ── language: EN / Latin American Spanish ──
+        // The host announces its language via LANG messages; a player who
+        // taps the toggle overrides it for their own phone only.
+        let LANG = localStorage.getItem("lang") || "en";
+        let LANG_MANUAL = false;
+        const STR = {
+            en: {
+                join_game: "JOIN THE GAME", nickname: "YOUR NICKNAME", join: "JOIN",
+                connecting: "CONNECTING...", design: "DESIGN YOUR LUCHADOR",
+                select_mask: "SELECT MASK", base: "BASE COLOR", accent: "ACCENT {0}",
+                pick: "Pick your template!", write: "Write your best joke!",
+                top: "TOP TEXT", bottom: "BOTTOM TEXT", finish: "FINISH",
+                playing: "Playing as: {0}", waiting_host: "Waiting for Host...",
+                submitted: "Submitted! Waiting for clock...",
+                time_left: "\u23F3 Time Left: {0}s", times_up: "\u23F3 Time's up! Waiting for server...",
+                vote_title: "Vote for the best meme!", vote_for: "Vote for {0}",
+                vote_locked: "Vote locked in!", tie: "IT'S A TIE!",
+                winner_prefix: "WINNER: ", points: "+{0} Points!",
+                round_over: "Round over! Tallying scores...",
+                ultimate: "\uD83C\uDFC6 ULTIMATE WINNER: {0} \uD83C\uDFC6",
+                you_second: "\u26A1 YOU have to make a SECOND meme! Pick a template:",
+                other_second: "\u23F3 {0} has to make a second meme..."
+            },
+            es: {
+                join_game: "\u00DANETE AL JUEGO", nickname: "TU APODO", join: "UNIRME",
+                connecting: "CONECTANDO...", design: "DISE\u00D1A TU LUCHADOR",
+                select_mask: "ELIGE TU M\u00C1SCARA", base: "COLOR BASE", accent: "ACENTO {0}",
+                pick: "\u00A1Elige tu plantilla!", write: "\u00A1Escribe tu mejor broma!",
+                top: "TEXTO DE ARRIBA", bottom: "TEXTO DE ABAJO", finish: "LISTO",
+                playing: "Jugando como: {0}", waiting_host: "Esperando al anfitri\u00F3n...",
+                submitted: "\u00A1Enviado! Esperando el reloj...",
+                time_left: "\u23F3 Tiempo: {0}s", times_up: "\u23F3 \u00A1Se acab\u00F3! Esperando...",
+                vote_title: "\u00A1Vota por el mejor meme!", vote_for: "Vota por {0}",
+                vote_locked: "\u00A1Voto enviado!", tie: "\u00A1EMPATE!",
+                winner_prefix: "GANADOR: ", points: "\u00A1+{0} Puntos!",
+                round_over: "Termin\u00F3 la ronda. Contando puntos...",
+                ultimate: "\uD83C\uDFC6 GANADOR ABSOLUTO: {0} \uD83C\uDFC6",
+                you_second: "\u26A1 \u00A1T\u00DA tienes que hacer un SEGUNDO meme! Elige una plantilla:",
+                other_second: "\u23F3 {0} tiene que hacer un segundo meme..."
+            }
+        };
+        function T(key) {
+            let v = (STR[LANG] && STR[LANG][key] !== undefined) ? STR[LANG][key] : STR.en[key];
+            for (let i = 1; i < arguments.length; i++) {
+                v = v.split("{" + (i - 1) + "}").join(arguments[i]);
+            }
+            return v;
+        }
+        function toggleLang() {
+            LANG = LANG === "en" ? "es" : "en";
+            LANG_MANUAL = true;
+            localStorage.setItem("lang", LANG);
+            applyLang();
+        }
+        function applyLang() {
+            document.getElementById("langBtn").textContent = LANG === "en" ? "EN" : "ES";
+            document.getElementById("joinTitle").textContent = T("join_game");
+            document.getElementById("nameInput").placeholder = T("nickname");
+            document.getElementById("connectBtn").innerText = T("join");
+            document.getElementById("designTitle").textContent = T("design");
+            document.getElementById("selectMaskTitle").textContent = T("select_mask");
+            document.getElementById("lblBase").textContent = T("base");
+            for (let i = 1; i <= 3; i++) document.getElementById("lblAcc" + i).textContent = T("accent", i);
+            document.getElementById("pickTitle").textContent = T("pick");
+            document.getElementById("writeTitle").textContent = T("write");
+            document.getElementById("topTextInput").placeholder = T("top");
+            document.getElementById("bottomTextInput").placeholder = T("bottom");
+            document.getElementById("finishBtn").innerText = T("finish");
+            const wm = document.getElementById("waitingMessage");
+            if (wm.innerText.indexOf("Waiting for Host") === 0 || wm.innerText.indexOf("Esperando al anfitri") === 0) {
+                wm.innerText = T("waiting_host");
+            }
+        }
+        applyLang();
+
         function startLocalTimer(seconds) {
             clearInterval(localTimer);
             let time = seconds;
@@ -381,9 +458,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             localTimer = setInterval(() => {
                 if (time <= 0) {
                     clearInterval(localTimer);
-                    display.innerText = "⏳ Time's up! Waiting for server...";
+                    display.innerText = T("times_up");
                 } else {
-                    display.innerText = "⏳ Time Left: " + time + "s";
+                    display.innerText = T("time_left", time);
                     time--;
                 }
             }, 1000);
@@ -391,14 +468,14 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
         function connectToServer() {
             playerName = document.getElementById("nameInput").value.trim().replace(/,/g, "") || ("Player" + Math.floor(Math.random()*1000));
-            document.getElementById("connectBtn").innerText = "CONNECTING...";
+            document.getElementById("connectBtn").innerText = T("connecting");
             socket = new WebSocket(SERVER_URL);
 
             socket.onopen = async () => {
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
                 document.getElementById("playerNameDisplay").innerHTML = maskSVG(MASK_ART[maskCfg.mask], 30, true);
-                document.getElementById("playerNameDisplay").appendChild(document.createTextNode("Playing as: " + playerName));
+                document.getElementById("playerNameDisplay").appendChild(document.createTextNode(T("playing", playerName)));
                 // Send the mask design + a small PNG snapshot of the EXACT
                 // designed mask, so the host lobby shows the real artwork
                 const png = await maskToPngDataURL();
@@ -445,7 +522,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     voteScreen.style.display = "block";
 
                     currentMatchup = [];
-                    voteScreen.innerHTML = "<h3>Vote for the best meme!</h3>";
+                    voteScreen.innerHTML = "<h3>" + T("vote_title") + "</h3>";
                     for (let k = 0; k < count; k++) {
                         let base = 3 + k * 4;
                         let name = parts[base], top = parts[base + 1], bottom = parts[base + 2], img = parts[base + 3];
@@ -459,6 +536,15 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         voteScreen.appendChild(voteRow);
                     }
                     startLocalTimer(seconds);
+                }
+
+                if (command === "LANG") {
+                    // host language announcement — follow it unless this
+                    // player tapped their own EN/ES toggle
+                    if (!LANG_MANUAL) {
+                        LANG = parts[1] === "es" ? "es" : "en";
+                        applyLang();
+                    }
                 }
 
                 if (command === "SECOND_MEME") {
@@ -476,7 +562,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         selectedImage = "";
                         document.getElementById("topTextInput").value = "";
                         document.getElementById("bottomTextInput").value = "";
-                        notice.innerText = "⚡ YOU have to make a SECOND meme! Pick a template:";
+                        notice.innerText = T("you_second");
                         showRandomTemplates(3);
                         document.getElementById("imageScreen").style.display = "block";
                     } else {
@@ -489,7 +575,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                             document.getElementById("imageScreen").style.display = "block";
                             showRandomTemplates(3);
                         }
-                        notice.innerText = "⏳ " + who + " has to make a second meme...";
+                        notice.innerText = T("other_second", who);
                     }
                     startLocalTimer(seconds);
                 }
@@ -518,14 +604,14 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     winnerScreen.innerHTML = "";
 
                     if (winner === "TIE") {
-                        winnerScreen.innerHTML = `<h2>IT'S A TIE!</h2>`;
+                        winnerScreen.innerHTML = `<h2>${T("tie")}</h2>`;
                     } else {
                         let title = document.createElement("h2");
                         title.appendChild(maskAvatar(winner));
-                        title.appendChild(document.createTextNode("WINNER: " + winner));
+                        title.appendChild(document.createTextNode(T("winner_prefix") + winner));
                         let pointsLabel = document.createElement("h3");
                         pointsLabel.style.color = "yellow";
-                        pointsLabel.textContent = "+" + points + " Points!";
+                        pointsLabel.textContent = T("points", points);
                         let card = makeMemeCard(imgUrl, topT, botT, winner);
                         card.querySelector("img").style.borderColor = "yellow";
                         winnerScreen.appendChild(title);
@@ -536,7 +622,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                 if (command === "ROUND_SUMMARY") {
                     document.getElementById("matchWinnerScreen").style.display = "none";
-                    document.getElementById("waitingMessage").innerText = "Round over! Tallying scores...";
+                    document.getElementById("waitingMessage").innerText = T("round_over");
                     document.getElementById("waitingMessage").style.display = "block";
                 }
 
@@ -557,7 +643,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     // the name reveals letter by letter over 10 seconds
                     let revealSpan = document.createElement("span");
                     overMsg.appendChild(revealSpan);
-                    let full = "🏆 ULTIMATE WINNER: " + parts[1] + " 🏆";
+                    let full = T("ultimate", parts[1]);
                     let shown = 0;
                     window.__revealTimer = setInterval(() => {
                         shown++;
@@ -593,16 +679,17 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             mySubmitted = true;
             socket.send("SUBMIT_MEME," + playerName + "," + t + "," + b + "," + selectedImage);
             document.getElementById("captionScreen").style.display = "none";
-            document.getElementById("waitingMessage").innerText = "Submitted! Waiting for clock...";
+            document.getElementById("waitingMessage").innerText = T("submitted");
             document.getElementById("waitingMessage").style.display = "block";
         }
 
         function castVote(index) {
             socket.send("VOTE," + playerName + "," + currentMatchup[index]);
             document.getElementById("voteScreen").style.display = "none";
-            document.getElementById("waitingMessage").innerText = "Vote locked in!";
+            document.getElementById("waitingMessage").innerText = T("vote_locked");
             document.getElementById("waitingMessage").style.display = "block";
         }
+
     </script>
 </body>
 </html>
