@@ -349,15 +349,15 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         // rasterize the designed mask so the host lobby shows the EXACT mask
         function maskToPngDataURL() {
             const entry = MASK_ART[maskCfg.mask];
-            const svg = maskSVG(entry, 72, true);
+            const svg = maskSVG(entry, 400, true);
             return new Promise((resolve) => {
                 const img = new Image();
                 const blob = new Blob([svg], { type: "image/svg+xml" });
                 const url = URL.createObjectURL(blob);
                 img.onload = () => {
                     const canvas = document.createElement("canvas");
-                    canvas.width = 72;
-                    canvas.height = Math.round(72 * entry.h / entry.w);
+                    canvas.width = 400;
+                    canvas.height = Math.round(400 * entry.h / entry.w);
                     canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
                     URL.revokeObjectURL(url);
                     try { resolve(canvas.toDataURL("image/png")); } catch (e) { resolve(""); }
