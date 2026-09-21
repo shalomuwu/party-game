@@ -69,7 +69,14 @@
         }
         #palette div { width: 34px; height: 34px; border-radius: 6px; cursor: pointer; border: 2px solid #ddd; }
         .player-name-display { font-size: 24px; color: #7fd8c2; margin-bottom: 14px; letter-spacing: 1px; }
+        .player-name-display svg { vertical-align: middle; margin-right: 8px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+        .vote-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .mini-mask { width: 38px; height: auto; border-radius: 10px; vertical-align: middle; box-shadow: 0 2px 5px rgba(0,0,0,.4); }
+        h2 .mini-mask { margin-right: 10px; }
         #waitingMessage { font-size: 22px; font-weight: bold; color: #ffd166; margin-top: 20px; letter-spacing: 1px; }
+        #notice { display: none; font-size: 21px; font-weight: bold; color: #ffd166; margin: 12px 0 4px; letter-spacing: 1px; text-shadow: 0 2px 0 #14241e; }
+        .meme-display.chale { background: #30343b; }
+        .meme-display.chale img { width: 58%; margin: 20% auto; border: none; background: transparent; }
 
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
@@ -105,6 +112,7 @@
 
     <div id="gameScreen" style="display: none;">
         <div class="player-name-display" id="playerNameDisplay"></div>
+        <div id="notice" style="display: none;"></div>
         <div id="waitingMessage">Waiting for Host...</div>
         
         <div id="imageScreen" style="display: none;">
@@ -137,6 +145,19 @@
         // The names currently up for voting (2 or 3). Buttons vote by INDEX
         // so names with apostrophes or quotes can't break the button.
         let currentMatchup = [];
+        // Other players' luchador masks, sent by the host as MASKOF messages
+        // (name -> png data URL). Used wherever we show someone's name.
+        let maskByName = {};
+
+        // Small mask avatar for a player name; updates itself later if the
+        // mask arrives after the screen was already built.
+        function maskAvatar(name) {
+            let img = document.createElement("img");
+            img.className = "mini-mask";
+            img.dataset.maskfor = name;
+            if (maskByName[name]) img.src = maskByName[name];
+            return img;
+        }
 
         // Fills the template picker with `count` different random images.
         // Called on every NEW_ROUND so players get fresh choices each time.
@@ -159,11 +180,17 @@
 
         // Builds a meme card safely: caption text goes in via textContent,
         // so players can't break the screen by typing < or " in their jokes.
-        function makeMemeCard(imgUrl, topText, bottomText) {
+        // When there is no image (player didn't submit), show their mask.
+        function makeMemeCard(imgUrl, topText, bottomText, name) {
             let card = document.createElement("div");
             card.className = "meme-display";
             let img = document.createElement("img");
-            img.src = imgUrl;
+            if (!imgUrl && name && maskByName[name]) {
+                img.src = maskByName[name];
+                card.classList.add("chale");
+            } else {
+                img.src = imgUrl;
+            }
             let top = document.createElement("div");
             top.className = "meme-text meme-top";
             top.textContent = topText;
@@ -365,7 +392,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             socket.onopen = async () => {
                 document.getElementById("setupScreen").style.display = "none";
                 document.getElementById("gameScreen").style.display = "block";
-                document.getElementById("playerNameDisplay").innerText = "Playing as: " + playerName;
+                document.getElementById("playerNameDisplay").innerHTML = maskSVG(MASK_ART[maskCfg.mask], 30, true);
+                document.getElementById("playerNameDisplay").appendChild(document.createTextNode("Playing as: " + playerName));
                 // Send the mask design + a small PNG snapshot of the EXACT
                 // designed mask, so the host lobby shows the real artwork
                 const png = await maskToPngDataURL();
@@ -383,9 +411,11 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                 if (command === "NEW_ROUND") {
                     let seconds = parseInt(parts[1]);
+                    if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
                     document.getElementById("topTextInput").value = "";
                     document.getElementById("bottomTextInput").value = "";
                     selectedImage = "";
+                    document.getElementById("notice").style.display = "none";
                     
                     document.getElementById("matchWinnerScreen").style.display = "none";
                     document.getElementById("captionScreen").style.display = "none";
@@ -399,7 +429,6 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 if (command === "VOTE_TIME") {
                     let seconds = parseInt(parts[1]);
                     // Format: VOTE_TIME,seconds,count, then per meme: name,top,bottom,img
-                    // (2 memes normally, 3 memes when the host runs 12+ players)
                     let count = parseInt(parts[2]);
                     const colors = ["#ef233c", "#3a86ff", "#ffbe0b"];
 
@@ -416,10 +445,50 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         let name = parts[base], top = parts[base + 1], bottom = parts[base + 2], img = parts[base + 3];
                         currentMatchup.push(name);
                         if (k > 0) voteScreen.appendChild(document.createElement("br"));
-                        voteScreen.appendChild(makeMemeCard(img, top, bottom));
-                        voteScreen.appendChild(makeVoteButton(name, colors[k % colors.length], k));
+                        voteScreen.appendChild(makeMemeCard(img, top, bottom, name));
+                        let voteRow = document.createElement("div");
+                        voteRow.className = "vote-row";
+                        voteRow.appendChild(maskAvatar(name));
+                        voteRow.appendChild(makeVoteButton(name, colors[k % colors.length], k));
+                        voteScreen.appendChild(voteRow);
                     }
                     startLocalTimer(seconds);
+                }
+
+                if (command === "SECOND_MEME") {
+                    // SECOND_MEME,seconds,name — the named player must make a
+                    // second meme; everyone else just waits for them
+                    let seconds = parseInt(parts[1]);
+                    let who = parts[2];
+                    document.getElementById("voteScreen").style.display = "none";
+                    document.getElementById("matchWinnerScreen").style.display = "none";
+                    let notice = document.getElementById("notice");
+                    notice.style.display = "block";
+                    if (who === playerName) {
+                        // back to the picker for a SECOND meme
+                        selectedImage = "";
+                        document.getElementById("topTextInput").value = "";
+                        document.getElementById("bottomTextInput").value = "";
+                        notice.innerText = "⚡ YOU have to make a SECOND meme! Pick a template:";
+                        showRandomTemplates(3);
+                        document.getElementById("imageScreen").style.display = "block";
+                    } else {
+                        document.getElementById("imageScreen").style.display = "none";
+                        document.getElementById("captionScreen").style.display = "none";
+                        notice.innerText = "⏳ " + who + " has to make a second meme...";
+                    }
+                    startLocalTimer(seconds);
+                }
+
+                if (command === "MASKOF") {
+                    // MASKOF,name,data:image/png;base64,PAYLOAD — the payload
+                    // itself contains commas, so rejoin everything after the name
+                    let maskOwner = parts[1];
+                    let png = parts.slice(2).join(",");
+                    maskByName[maskOwner] = png;
+                    // fill in avatars on screens that were already rendered
+                    document.querySelectorAll(`img[data-maskfor="${CSS.escape(maskOwner)}"]`)
+                        .forEach(el => { el.src = png; });
                 }
 
                 if (command === "MATCH_WINNER") {
@@ -438,11 +507,12 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         winnerScreen.innerHTML = `<h2>IT'S A TIE!</h2>`;
                     } else {
                         let title = document.createElement("h2");
-                        title.textContent = "WINNER: " + winner;
+                        title.appendChild(maskAvatar(winner));
+                        title.appendChild(document.createTextNode("WINNER: " + winner));
                         let pointsLabel = document.createElement("h3");
                         pointsLabel.style.color = "yellow";
                         pointsLabel.textContent = "+" + points + " Points!";
-                        let card = makeMemeCard(imgUrl, topT, botT);
+                        let card = makeMemeCard(imgUrl, topT, botT, winner);
                         card.querySelector("img").style.borderColor = "yellow";
                         winnerScreen.appendChild(title);
                         winnerScreen.appendChild(pointsLabel);
@@ -458,9 +528,31 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                 if (command === "GAME_OVER") {
                     clearInterval(localTimer);
+                    if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
                     document.getElementById("matchWinnerScreen").style.display = "none";
-                    document.getElementById("waitingMessage").innerText = "🏆 ULTIMATE WINNER: " + parts[1] + " 🏆";
-                    document.getElementById("waitingMessage").style.display = "block";
+                    let overMsg = document.getElementById("waitingMessage");
+                    overMsg.style.display = "block";
+                    overMsg.innerText = "";
+                    // the winner's mask beside the reveal
+                    if (maskByName[parts[1]]) {
+                        let overMask = maskAvatar(parts[1]);
+                        overMask.style.width = "44px";
+                        overMsg.appendChild(overMask);
+                        overMsg.appendChild(document.createTextNode(" "));
+                    }
+                    // the name reveals letter by letter over 10 seconds
+                    let revealSpan = document.createElement("span");
+                    overMsg.appendChild(revealSpan);
+                    let full = "🏆 ULTIMATE WINNER: " + parts[1] + " 🏆";
+                    let shown = 0;
+                    window.__revealTimer = setInterval(() => {
+                        shown++;
+                        revealSpan.textContent = full.slice(0, shown);
+                        if (shown >= full.length) {
+                            clearInterval(window.__revealTimer);
+                            window.__revealTimer = null;
+                        }
+                    }, 10000 / full.length);
                 }
             };
             socket.onclose = () => {
