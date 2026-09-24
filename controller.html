@@ -503,7 +503,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("voteScreen").style.display = "none";
 
-                    showRandomTemplates(3);
+                    showRandomTemplates(4);
                     document.getElementById("imageScreen").style.display = "block";
                     startLocalTimer(seconds);
                 }
@@ -562,7 +562,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         document.getElementById("topTextInput").value = "";
                         document.getElementById("bottomTextInput").value = "";
                         notice.innerText = T("you_second");
-                        showRandomTemplates(3);
+                        showRandomTemplates(4);
                         document.getElementById("imageScreen").style.display = "block";
                     } else {
                         // everyone else keeps their picker/caption screen —
@@ -572,7 +572,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                             && document.getElementById("captionScreen").style.display !== "block"
                             && document.getElementById("voteScreen").style.display !== "block") {
                             document.getElementById("imageScreen").style.display = "block";
-                            showRandomTemplates(3);
+                            showRandomTemplates(4);
                         }
                         notice.innerText = T("other_second", who);
                     }
