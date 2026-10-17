@@ -210,6 +210,7 @@
         // how many images actually exist (.jpeg or .jpg both accepted), so
         // newly added images show up automatically — no code change needed.
         // The scan moves in batches and stops at the first fully-empty batch.
+        const IMAGE_DIR_URL = "https://shalomuwu.github.io/party-game/images/";
         const IMAGE_BASE_URL = "https://shalomuwu.github.io/party-game/images/meme";
         const VIDEO_DIR_URL = "https://shalomuwu.github.io/party-game/videos/";
         const VIDEO_BASE_URL = "https://shalomuwu.github.io/party-game/videos/vid";
@@ -225,8 +226,95 @@
         ];
         const imagePoolReady = new Promise(res => { window.__poolResolve = res; });
         const videoPoolReady = new Promise(res => { window.__videoPoolResolve = res; });
+
+        // ── Rolling 4-image batch preloader ──
+        // Pre-picks and downloads the 4 images for the upcoming round as soon
+        // as the page opens, and once shown, immediately caches the NEXT 4 in
+        // the background so every round's templates appear instantaneously.
+        let shuffledImageDeck = [];
+        let preloadedImageBatches = [];
+        let preloadingInFlight = false;
+        let videosPrewarmed = false;
+
+        function drawFromImageDeck(count) {
+            const picked = [];
+            const usedInBatch = new Set();
+            while (picked.length < count && imagePool.length > 0) {
+                if (shuffledImageDeck.length === 0) {
+                    shuffledImageDeck = imagePool.slice();
+                    for (let i = shuffledImageDeck.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        const tmp = shuffledImageDeck[i];
+                        shuffledImageDeck[i] = shuffledImageDeck[j];
+                        shuffledImageDeck[j] = tmp;
+                    }
+                }
+                const candidate = shuffledImageDeck.pop();
+                if (!usedInBatch.has(candidate) || imagePool.length <= count) {
+                    usedInBatch.add(candidate);
+                    picked.push(candidate);
+                }
+            }
+            return picked;
+        }
+
+        function preloadSingleImage(url) {
+            return new Promise(resolve => {
+                const im = new Image();
+                im.decoding = "async";
+                let done = false;
+                const finish = () => {
+                    if (done) return;
+                    done = true;
+                    if (typeof im.decode === "function") {
+                        im.decode().catch(() => {}).finally(() => resolve({ url, img: im }));
+                    } else {
+                        resolve({ url, img: im });
+                    }
+                };
+                im.onload = finish;
+                im.onerror = finish;
+                im.src = url;
+            });
+        }
+
+        async function ensurePreloadedBatches(targetBatches = 2, batchSize = 4) {
+            await imagePoolReady;
+            if (imagePool.length === 0 || preloadingInFlight) return;
+            preloadingInFlight = true;
+            try {
+                while (preloadedImageBatches.length < targetBatches) {
+                    const urls = drawFromImageDeck(Math.min(batchSize, imagePool.length));
+                    if (urls.length === 0) break;
+                    // Preload all 4 images of this batch in parallel before starting the next batch
+                    const items = await Promise.all(urls.map(u => preloadSingleImage(u)));
+                    preloadedImageBatches.push(items);
+                }
+                // Once the upcoming image batches are cached, gently pre-warm
+                // the Round 4 videos in the background HTTP cache
+                if (!videosPrewarmed) {
+                    videosPrewarmed = true;
+                    prewarmVideosInBackground();
+                }
+            } finally {
+                preloadingInFlight = false;
+            }
+        }
+
+        async function prewarmVideosInBackground() {
+            await videoPoolReady;
+            for (const vUrl of videoPool) {
+                try {
+                    await fetch(vUrl, { cache: "force-cache" });
+                } catch (e) {}
+            }
+        }
+
         function isVideoUrl(url) {
             return /\.(mp4|webm|ogv|mov)(\?.*)?$/i.test(url || "");
+        }
+        function isImageFile(name) {
+            return /\.(jpe?g|png|webp)(\?.*)?$/i.test(name || "");
         }
         function probeImage(url) {
             // HEAD check: transfers a few bytes instead of downloading the
@@ -266,26 +354,48 @@
             return null;
         }
         async function buildImagePool() {
-            // 4 gentle parallel walkers + one retry per miss: fast enough to
-            // scan the whole repo, gentle enough not to trip rate limiting
-            let n = 1;
-            let missStreak = 0;
-            const worker = async () => {
-                while (n <= SCAN_LIMIT && missStreak < 15) {
-                    const my = n++;
-                    const u = await probeNumber(my);
-                    if (u) { imagePool.push(u); missStreak = 0; }
-                    else { missStreak++; }
+            const found = [];
+            try {
+                // Fast path: list the GitHub repo's images/ directory in 1 request
+                const resp = await fetch("https://api.github.com/repos/shalomuwu/party-game/contents/images");
+                if (resp.ok) {
+                    const items = await resp.json();
+                    if (Array.isArray(items)) {
+                        for (const item of items) {
+                            if (item && item.name && isImageFile(item.name)) {
+                                found.push(IMAGE_DIR_URL + item.name);
+                            }
+                        }
+                    }
                 }
-            };
-            await Promise.all([worker(), worker(), worker(), worker()]);
+            } catch (e) {}
+
+            if (found.length === 0) {
+                // Fallback: 4 gentle parallel walkers + one retry per miss
+                let n = 1;
+                let missStreak = 0;
+                const worker = async () => {
+                    while (n <= SCAN_LIMIT && missStreak < 15) {
+                        const my = n++;
+                        const u = await probeNumber(my);
+                        if (u) { found.push(u); missStreak = 0; }
+                        else { missStreak++; }
+                    }
+                };
+                await Promise.all([worker(), worker(), worker(), worker()]);
+            }
+
             // keep them in numeric order for tidy logging/picking
-            imagePool.sort((a, b) => {
-                const na = parseInt(a.match(/meme(\d+)/)[1], 10);
-                const nb = parseInt(b.match(/meme(\d+)/)[1], 10);
-                return na - nb;
+            found.sort((a, b) => {
+                const ma = a.match(/meme(\d+)/i);
+                const mb = b.match(/meme(\d+)/i);
+                return (ma ? parseInt(ma[1], 10) : 0) - (mb ? parseInt(mb[1], 10) : 0);
             });
+            imagePool = found;
             window.__poolResolve();  // always resolve even if zero found
+            // Immediately cache the first 4 images (and then the next 4) while the
+            // player is still on the Join / Luchador Designer screen!
+            ensurePreloadedBatches(2, 4);
         }
         async function buildVideoPool() {
             const found = [];
@@ -353,22 +463,36 @@
         }
 
         // Fills the template picker with `count` different random images.
-        // Called on every NEW_ROUND so players get fresh choices each time.
+        // Uses the preloaded 4-image batch so templates appear with zero delay,
+        // and immediately preloads the next batch of 4 in the background.
         function showRandomTemplates(count) {
             document.getElementById("pickTitle").textContent = T("pick");
             imagePoolReady.then(() => {
-                let pool = imagePool.slice();
                 let box = document.getElementById("imageChoices");
                 box.innerHTML = "";
-                count = Math.min(count, pool.length);
-                for (let k = 0; k < count; k++) {
-                    let idx = Math.floor(Math.random() * pool.length);
-                    let img = document.createElement("img");
-                    img.src = pool.splice(idx, 1)[0];
+                count = Math.min(count, imagePool.length);
+
+                let batch = preloadedImageBatches.shift();
+                if (!batch || batch.length === 0) {
+                    const urls = drawFromImageDeck(count);
+                    batch = urls.map(url => {
+                        const im = new Image();
+                        im.src = url;
+                        return { url, img: im };
+                    });
+                }
+
+                for (let k = 0; k < batch.length; k++) {
+                    const entry = batch[k];
+                    const img = entry.img || document.createElement("img");
+                    if (!img.src) img.src = entry.url;
                     img.className = "meme-option";
-                    img.onclick = () => pickImage(img.src);
+                    img.onclick = () => pickImage(entry.url);
                     box.appendChild(img);
                 }
+
+                // Immediately cache the NEXT 4 images in the background
+                ensurePreloadedBatches(2, count);
             });
         }
 
