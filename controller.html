@@ -81,8 +81,26 @@
         .meme-display.chale img { width: 58%; margin: 20% auto; border: none; background: transparent; }
 
         .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
+        .meme-option.video-vertical {
+            width: 44%; max-width: 175px; aspect-ratio: 9 / 16; object-fit: cover;
+            background: #000; display: inline-block; margin: 6px; vertical-align: top;
+            border: 3px solid var(--gold); overflow: hidden; position: relative;
+        }
+        .meme-option.video-vertical canvas {
+            width: 100% !important; height: 100% !important; object-fit: cover; display: block;
+        }
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
+        .meme-display.video-card { width: 68%; max-width: 225px; aspect-ratio: 9 / 16; }
         .meme-display img { width: 100%; border-radius: 10px; border: 3px solid #00b4d8; display: block; }
+        .meme-display video,
+        .meme-display ogvjs {
+            width: 100%; height: 100%; aspect-ratio: 9 / 16; object-fit: cover;
+            border-radius: 10px; border: 3px solid #00b4d8; display: block; background: #000;
+            overflow: hidden; box-sizing: border-box;
+        }
+        .meme-display ogvjs canvas {
+            width: 100% !important; height: 100% !important; object-fit: cover; display: block;
+        }
         .meme-text {
             position: absolute; width: 100%; text-align: center; color: white;
             font-family: 'Impact', sans-serif; font-size: 26px; text-transform: uppercase;
@@ -94,6 +112,7 @@
         .meme-top { top: 10px; }
         .meme-bottom { bottom: 10px; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/ogv@1.8.9/dist/ogv.js"></script>
 </head>
 <body>
     <img id="langBtn" class="lang-btn" onclick="toggleLang()" alt="language" title="EN / ES">
@@ -127,9 +146,14 @@
 
         <div id="captionScreen" style="display: none;">
             <h3 id="writeTitle">Write your best joke!</h3>
-            <img id="captionImage" src="" style="width: 80%; max-width: 250px; border-radius: 10px; margin-bottom: 10px;">
-            <br><input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;">
-            <br><input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;">
+            <div id="captionPreviewBox" class="meme-display" style="margin-bottom: 10px;">
+                <img id="captionImage" src="" style="width: 100%; border-radius: 10px;">
+                <div id="captionVideoMount" style="display: none; width: 100%; height: 100%;"></div>
+                <div id="previewTop" class="meme-text meme-top"></div>
+                <div id="previewBottom" class="meme-text meme-bottom"></div>
+            </div>
+            <br><input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;" oninput="updateCaptionPreview()">
+            <br><input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;" oninput="updateCaptionPreview()">
             <br><button id="finishBtn" class="btn" onclick="submitMeme()">FINISH</button>
         </div>
 
@@ -139,6 +163,47 @@
 
     <script>
         const SERVER_URL = "wss://game.shalomuwu.com";
+        if (window.OGVLoader) {
+            OGVLoader.base = "https://cdn.jsdelivr.net/npm/ogv@1.8.9/dist";
+        }
+        const CAN_PLAY_OGV_NATIVE = (() => {
+            try {
+                const v = document.createElement("video");
+                return !!(v.canPlayType && v.canPlayType('video/ogg; codecs="theora"').replace(/^no$/, ""));
+            } catch (e) {
+                return false;
+            }
+        })();
+
+        // Creates a looping muted video element that plays .ogv natively on
+        // Android/Desktop and automatically falls back to OGVPlayer on iOS Safari.
+        function createVideoElement(url, className) {
+            const isOgv = /\.ogv(\?.*)?$/i.test(url || "");
+            if (isOgv && !CAN_PLAY_OGV_NATIVE && window.OGVPlayer) {
+                const player = new OGVPlayer({ enableWebM: false });
+                if (className) player.className = className;
+                player.muted = true;
+                player.loop = true;
+                player.src = url;
+                player.addEventListener("ended", () => {
+                    try { player.currentTime = 0; player.play(); } catch (e) {}
+                });
+                setTimeout(() => { try { player.play(); } catch (e) {} }, 30);
+                return player;
+            }
+            const vid = document.createElement("video");
+            vid.src = url;
+            vid.autoplay = true;
+            vid.loop = true;
+            vid.muted = true;
+            vid.playsInline = true;
+            vid.setAttribute("playsinline", "");
+            vid.setAttribute("webkit-playsinline", "");
+            vid.setAttribute("muted", "");
+            if (className) vid.className = className;
+            setTimeout(() => { try { vid.play().catch(() => {}); } catch (e) {} }, 30);
+            return vid;
+        }
 
         // The real meme images hosted next to this page on GitHub Pages.
         // Meme templates: the phone SCANs the repo once per session to find
@@ -146,9 +211,23 @@
         // newly added images show up automatically — no code change needed.
         // The scan moves in batches and stops at the first fully-empty batch.
         const IMAGE_BASE_URL = "https://shalomuwu.github.io/party-game/images/meme";
+        const VIDEO_DIR_URL = "https://shalomuwu.github.io/party-game/videos/";
+        const VIDEO_BASE_URL = "https://shalomuwu.github.io/party-game/videos/vid";
+        const ALT_VIDEO_BASE_URL = "https://shalomuwu.github.io/party-game/videos/video";
         const SCAN_LIMIT = 400;  // absolute safety stop
         let imagePool = [];
+        let videoPool = [
+            VIDEO_DIR_URL + "vid1.ogv",
+            VIDEO_DIR_URL + "vid2.ogv",
+            VIDEO_DIR_URL + "vid3.ogv",
+            VIDEO_DIR_URL + "vid4.ogv",
+            VIDEO_DIR_URL + "vid5.ogv"
+        ];
         const imagePoolReady = new Promise(res => { window.__poolResolve = res; });
+        const videoPoolReady = new Promise(res => { window.__videoPoolResolve = res; });
+        function isVideoUrl(url) {
+            return /\.(mp4|webm|ogv|mov)(\?.*)?$/i.test(url || "");
+        }
         function probeImage(url) {
             // HEAD check: transfers a few bytes instead of downloading the
             // whole meme — the scan adds no data cost at page load
@@ -162,6 +241,11 @@
                     im.src = url;
                 }));
         }
+        function probeVideo(url) {
+            return fetch(url, { method: "HEAD" })
+                .then(r => r.ok ? url : null)
+                .catch(() => null);
+        }
         async function probeNumber(n) {
             const j = await probeImage(IMAGE_BASE_URL + n + ".jpeg");
             if (j) return j;
@@ -169,6 +253,17 @@
             if (g) return g;
             await new Promise(r => setTimeout(r, 300));  // one retry: transient failures happen
             return probeImage(IMAGE_BASE_URL + n + ".jpeg");
+        }
+        async function probeVideoNumber(n) {
+            const v1 = await probeVideo(VIDEO_BASE_URL + n + ".ogv");
+            if (v1) return v1;
+            const v2 = await probeVideo(VIDEO_BASE_URL + n + ".mp4");
+            if (v2) return v2;
+            const v3 = await probeVideo(ALT_VIDEO_BASE_URL + n + ".ogv");
+            if (v3) return v3;
+            const v4 = await probeVideo(ALT_VIDEO_BASE_URL + n + ".mp4");
+            if (v4) return v4;
+            return null;
         }
         async function buildImagePool() {
             // 4 gentle parallel walkers + one retry per miss: fast enough to
@@ -192,9 +287,52 @@
             });
             window.__poolResolve();  // always resolve even if zero found
         }
+        async function buildVideoPool() {
+            const found = [];
+            try {
+                // Fast path: list the GitHub repo's videos/ directory directly
+                const resp = await fetch("https://api.github.com/repos/shalomuwu/party-game/contents/videos");
+                if (resp.ok) {
+                    const items = await resp.json();
+                    if (Array.isArray(items)) {
+                        for (const item of items) {
+                            if (item && item.name && isVideoUrl(item.name)) {
+                                found.push(VIDEO_DIR_URL + item.name);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            if (found.length === 0) {
+                let n = 1;
+                let missStreak = 0;
+                const worker = async () => {
+                    while (n <= SCAN_LIMIT && missStreak < 10) {
+                        const my = n++;
+                        const u = await probeVideoNumber(my);
+                        if (u) { found.push(u); missStreak = 0; }
+                        else { missStreak++; }
+                    }
+                };
+                await Promise.all([worker(), worker(), worker(), worker()]);
+            }
+
+            if (found.length > 0) {
+                found.sort((a, b) => {
+                    const ma = a.match(/(\d+)\.(mp4|ogv|webm)/i);
+                    const mb = b.match(/(\d+)\.(mp4|ogv|webm)/i);
+                    return (ma ? parseInt(ma[1], 10) : 0) - (mb ? parseInt(mb[1], 10) : 0);
+                });
+                videoPool = found;
+            }
+            window.__videoPoolResolve();
+        }
         buildImagePool();
+        buildVideoPool();
 
         let socket, playerName = "", selectedImage = "", localTimer = null;
+        let isFinalRound = false;
         // The names currently up for voting (2 or 3). Buttons vote by INDEX
         // so names with apostrophes or quotes can't break the button.
         let currentMatchup = [];
@@ -217,6 +355,7 @@
         // Fills the template picker with `count` different random images.
         // Called on every NEW_ROUND so players get fresh choices each time.
         function showRandomTemplates(count) {
+            document.getElementById("pickTitle").textContent = T("pick");
             imagePoolReady.then(() => {
                 let pool = imagePool.slice();
                 let box = document.getElementById("imageChoices");
@@ -233,18 +372,48 @@
             });
         }
 
+        // Fills the template picker with `count` different random 9:16 vertical videos
+        // for the Final 4th Round.
+        function showRandomVideos(count) {
+            document.getElementById("pickTitle").textContent = T("pick_video");
+            videoPoolReady.then(async () => {
+                if (videoPool.length === 0) {
+                    await buildVideoPool();
+                }
+                let pool = videoPool.slice();
+                let box = document.getElementById("imageChoices");
+                box.innerHTML = "";
+                count = Math.min(count, pool.length);
+                for (let k = 0; k < count; k++) {
+                    let idx = Math.floor(Math.random() * pool.length);
+                    let url = pool.splice(idx, 1)[0];
+                    let vid = createVideoElement(url, "meme-option video-vertical");
+                    vid.onclick = () => pickImage(url);
+                    box.appendChild(vid);
+                }
+            });
+        }
+
         // Builds a meme card safely: caption text goes in via textContent,
         // so players can't break the screen by typing < or " in their jokes.
-        // When there is no image (player didn't submit), show their mask.
+        // Supports both 1:1 images and 9:16 vertical videos.
         function makeMemeCard(imgUrl, topText, bottomText, name) {
             let card = document.createElement("div");
             card.className = "meme-display";
-            let img = document.createElement("img");
-            if (!imgUrl && name && maskByName[name]) {
-                img.src = maskByName[name];
-                card.classList.add("chale");
+            if (isVideoUrl(imgUrl)) {
+                card.classList.add("video-card");
+                let vid = createVideoElement(imgUrl, "");
+                card.appendChild(vid);
             } else {
-                img.src = imgUrl;
+                if (isFinalRound) card.classList.add("video-card");
+                let img = document.createElement("img");
+                if (!imgUrl && name && maskByName[name]) {
+                    img.src = maskByName[name];
+                    card.classList.add("chale");
+                } else {
+                    img.src = imgUrl;
+                }
+                card.appendChild(img);
             }
             let top = document.createElement("div");
             top.className = "meme-text meme-top";
@@ -252,7 +421,6 @@
             let bottom = document.createElement("div");
             bottom.className = "meme-text meme-bottom";
             bottom.textContent = bottomText;
-            card.appendChild(img);
             card.appendChild(top);
             card.appendChild(bottom);
             return card;
@@ -432,7 +600,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 join_game: "JOIN THE GAME", nickname: "YOUR NICKNAME", join: "JOIN",
                 connecting: "CONNECTING...", design: "DESIGN YOUR LUCHADOR",
                 select_mask: "SELECT MASK", base: "BASE COLOR", accent: "ACCENT {0}",
-                pick: "Pick your template!", write: "Write your best joke!",
+                pick: "Pick your template!", pick_video: "\uD83D\uDD25 FINAL ROUND! Pick your 9:16 video:",
+                write: "Write your best joke!",
                 top: "TOP TEXT", bottom: "BOTTOM TEXT", finish: "FINISH",
                 playing: "Playing as: {0}", waiting_host: "Waiting for Host...",
                 submitted: "Submitted! Waiting for clock...",
@@ -443,13 +612,17 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 round_over: "Round over! Tallying scores...",
                 ultimate: "\uD83C\uDFC6 ULTIMATE WINNER: {0} \uD83C\uDFC6",
                 you_second: "\u26A1 YOU have to make a SECOND meme! Pick a template:",
-                other_second: "\u23F3 {0} has to make a second meme..."
+                other_second: "\u23F3 {0} has to make a second meme...",
+                final_you: "\uD83D\uDD25 FINAL 1v1: {0} vs {1}! Make a 9:16 vertical video meme!",
+                final_spectator_caption: "\uD83D\uDD25 FINAL ROUND: {0} vs {1} are making their 9:16 video memes!",
+                final_spectator_vote: "\uD83D\uDD25 FINAL ROUND! Spectators are voting..."
             },
             es: {
                 join_game: "\u00DANETE AL JUEGO", nickname: "TU APODO", join: "UNIRME",
                 connecting: "CONECTANDO...", design: "DISE\u00D1A TU LUCHADOR",
                 select_mask: "ELIGE TU M\u00C1SCARA", base: "COLOR BASE", accent: "ACENTO {0}",
-                pick: "\u00A1Elige tu plantilla!", write: "\u00A1Escribe tu mejor broma!",
+                pick: "\u00A1Elige tu plantilla!", pick_video: "\uD83D\uDD25 \u00A1RONDA FINAL! Elige tu video 9:16:",
+                write: "\u00A1Escribe tu mejor broma!",
                 top: "TEXTO DE ARRIBA", bottom: "TEXTO DE ABAJO", finish: "LISTO",
                 playing: "Jugando como: {0}", waiting_host: "Esperando al anfitri\u00F3n...",
                 submitted: "\u00A1Enviado! Esperando el reloj...",
@@ -460,7 +633,10 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 round_over: "Termin\u00F3 la ronda. Contando puntos...",
                 ultimate: "\uD83C\uDFC6 GANADOR ABSOLUTO: {0} \uD83C\uDFC6",
                 you_second: "\u26A1 \u00A1T\u00DA tienes que hacer un SEGUNDO meme! Elige una plantilla:",
-                other_second: "\u23F3 {0} tiene que hacer un segundo meme..."
+                other_second: "\u23F3 {0} tiene que hacer un segundo meme...",
+                final_you: "\uD83D\uDD25 FINAL 1v1: \u00A1{0} vs {1}! \u00A1Crea un video meme vertical 9:16!",
+                final_spectator_caption: "\uD83D\uDD25 RONDA FINAL: \u00A1{0} vs {1} est\u00E1n creando sus video memes 9:16!",
+                final_spectator_vote: "\uD83D\uDD25 \u00A1RONDA FINAL! Los espectadores est\u00E1n votando..."
             }
         };
         function T(key) {
@@ -489,7 +665,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             document.getElementById("selectMaskTitle").textContent = T("select_mask");
             document.getElementById("lblBase").textContent = T("base");
             for (let i = 1; i <= 3; i++) document.getElementById("lblAcc" + i).textContent = T("accent", i);
-            document.getElementById("pickTitle").textContent = T("pick");
+            document.getElementById("pickTitle").textContent = isFinalRound ? T("pick_video") : T("pick");
             document.getElementById("writeTitle").textContent = T("write");
             document.getElementById("topTextInput").placeholder = T("top");
             document.getElementById("bottomTextInput").placeholder = T("bottom");
@@ -546,8 +722,10 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 if (command === "NEW_ROUND") {
                     let seconds = parseInt(parts[1]);
                     if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
+                    isFinalRound = false;
                     document.getElementById("topTextInput").value = "";
                     document.getElementById("bottomTextInput").value = "";
+                    updateCaptionPreview();
                     selectedImage = "";
                     mySubmitted = false;
                     document.getElementById("notice").style.display = "none";
@@ -561,6 +739,37 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     startLocalTimer(seconds);
                 }
 
+                if (command === "FINAL_ROUND") {
+                    // Format: FINAL_ROUND,seconds,finalist1,finalist2
+                    let seconds = parseInt(parts[1]);
+                    let f1 = parts[2] || "";
+                    let f2 = parts[3] || "";
+                    if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
+                    isFinalRound = true;
+                    document.getElementById("topTextInput").value = "";
+                    document.getElementById("bottomTextInput").value = "";
+                    updateCaptionPreview();
+                    selectedImage = "";
+                    mySubmitted = false;
+
+                    document.getElementById("matchWinnerScreen").style.display = "none";
+                    document.getElementById("captionScreen").style.display = "none";
+                    document.getElementById("voteScreen").style.display = "none";
+
+                    let notice = document.getElementById("notice");
+                    notice.style.display = "block";
+
+                    if (playerName === f1 || playerName === f2) {
+                        notice.innerText = T("final_you", f1, f2);
+                        showRandomVideos(4);
+                        document.getElementById("imageScreen").style.display = "block";
+                    } else {
+                        document.getElementById("imageScreen").style.display = "none";
+                        notice.innerText = T("final_spectator_caption", f1, f2);
+                    }
+                    startLocalTimer(seconds);
+                }
+
                 if (command === "VOTE_TIME") {
                     let seconds = parseInt(parts[1]);
                     // Format: VOTE_TIME,seconds,count, then per meme: name,top,bottom,img
@@ -569,6 +778,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                     document.getElementById("captionScreen").style.display = "none";
                     document.getElementById("imageScreen").style.display = "none";
+                    document.getElementById("notice").style.display = "none";
 
                     let voteScreen = document.getElementById("voteScreen");
                     voteScreen.style.display = "block";
@@ -588,6 +798,49 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         voteScreen.appendChild(voteRow);
                     }
                     startLocalTimer(seconds);
+                }
+
+                if (command === "FINAL_SPECTATOR_VOTE") {
+                    // Sent to the 2 finalists in Round 4 so they can watch the 1v1
+                    // video memes on their phone while spectators vote (finalists cannot vote).
+                    let seconds = parseInt(parts[1]);
+                    let count = parseInt(parts[2]);
+
+                    document.getElementById("captionScreen").style.display = "none";
+                    document.getElementById("imageScreen").style.display = "none";
+                    document.getElementById("notice").style.display = "none";
+
+                    let voteScreen = document.getElementById("voteScreen");
+                    voteScreen.style.display = "block";
+
+                    currentMatchup = [];
+                    voteScreen.innerHTML = "<h3 style='color:#ffbe0b;'>" + T("final_spectator_vote") + "</h3>";
+                    for (let k = 0; k < count; k++) {
+                        let base = 3 + k * 4;
+                        let name = parts[base], top = parts[base + 1], bottom = parts[base + 2], img = parts[base + 3];
+                        currentMatchup.push(name);
+                        if (k > 0) voteScreen.appendChild(document.createElement("br"));
+                        voteScreen.appendChild(makeMemeCard(img, top, bottom, name));
+                        let nameRow = document.createElement("div");
+                        nameRow.className = "vote-row";
+                        nameRow.appendChild(maskAvatar(name));
+                        let label = document.createElement("span");
+                        label.style.fontWeight = "bold";
+                        label.textContent = name;
+                        nameRow.appendChild(label);
+                        voteScreen.appendChild(nameRow);
+                    }
+                    startLocalTimer(seconds);
+                }
+
+                if (command === "WAITING") {
+                    let msg = parts.slice(1).join(",");
+                    document.getElementById("imageScreen").style.display = "none";
+                    document.getElementById("captionScreen").style.display = "none";
+                    document.getElementById("voteScreen").style.display = "none";
+                    let wm = document.getElementById("waitingMessage");
+                    wm.innerText = msg || T("waiting_host");
+                    wm.style.display = "block";
                 }
 
                 if (command === "LANG") {
@@ -614,6 +867,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         selectedImage = "";
                         document.getElementById("topTextInput").value = "";
                         document.getElementById("bottomTextInput").value = "";
+                        updateCaptionPreview();
                         notice.innerText = T("you_second");
                         showRandomTemplates(4);
                         document.getElementById("imageScreen").style.display = "block";
@@ -650,6 +904,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                     document.getElementById("voteScreen").style.display = "none";
                     document.getElementById("waitingMessage").style.display = "none";
+                    document.getElementById("notice").style.display = "none";
 
                     let winnerScreen = document.getElementById("matchWinnerScreen");
                     winnerScreen.style.display = "block";
@@ -665,7 +920,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         pointsLabel.style.color = "yellow";
                         pointsLabel.textContent = T("points", points);
                         let card = makeMemeCard(imgUrl, topT, botT, winner);
-                        card.querySelector("img").style.borderColor = "yellow";
+                        let mediaEl = card.querySelector("img, video, ogvjs");
+                        if (mediaEl) mediaEl.style.borderColor = "yellow";
                         winnerScreen.appendChild(title);
                         winnerScreen.appendChild(pointsLabel);
                         winnerScreen.appendChild(card);
@@ -674,6 +930,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                 if (command === "ROUND_SUMMARY") {
                     document.getElementById("matchWinnerScreen").style.display = "none";
+                    document.getElementById("notice").style.display = "none";
                     document.getElementById("waitingMessage").innerText = T("round_over");
                     document.getElementById("waitingMessage").style.display = "block";
                 }
@@ -682,6 +939,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     clearInterval(localTimer);
                     if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
                     document.getElementById("matchWinnerScreen").style.display = "none";
+                    document.getElementById("notice").style.display = "none";
                     let overMsg = document.getElementById("waitingMessage");
                     overMsg.style.display = "block";
                     overMsg.innerText = "";
@@ -717,11 +975,43 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             };
         }
 
+        function updateCaptionPreview() {
+            const topEl = document.getElementById("previewTop");
+            const botEl = document.getElementById("previewBottom");
+            if (topEl) topEl.textContent = document.getElementById("topTextInput").value;
+            if (botEl) botEl.textContent = document.getElementById("bottomTextInput").value;
+        }
+
+        function stopVideoMount() {
+            const mount = document.getElementById("captionVideoMount");
+            if (!mount) return;
+            Array.from(mount.children).forEach(ch => {
+                try { if (typeof ch.pause === "function") ch.pause(); } catch (e) {}
+            });
+            mount.innerHTML = "";
+            mount.style.display = "none";
+        }
+
         function pickImage(imgUrl) {
             selectedImage = imgUrl; 
             document.getElementById("imageScreen").style.display = "none";
             document.getElementById("captionScreen").style.display = "block";
-            document.getElementById("captionImage").src = selectedImage; 
+            const previewBox = document.getElementById("captionPreviewBox");
+            const imgEl = document.getElementById("captionImage");
+            const mount = document.getElementById("captionVideoMount");
+            stopVideoMount();
+            if (isVideoUrl(selectedImage)) {
+                previewBox.classList.add("video-card");
+                imgEl.style.display = "none";
+                imgEl.removeAttribute("src");
+                mount.style.display = "block";
+                mount.appendChild(createVideoElement(selectedImage, ""));
+            } else {
+                previewBox.classList.remove("video-card");
+                imgEl.style.display = "block";
+                imgEl.src = selectedImage;
+            }
+            updateCaptionPreview();
             socket.send("PICKED," + playerName + "," + imgUrl);
         }
 
@@ -729,6 +1019,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             let t = document.getElementById("topTextInput").value.trim().replace(/,/g, "");
             let b = document.getElementById("bottomTextInput").value.trim().replace(/,/g, "");
             mySubmitted = true;
+            stopVideoMount();
             socket.send("SUBMIT_MEME," + playerName + "," + t + "," + b + "," + selectedImage);
             document.getElementById("captionScreen").style.display = "none";
             document.getElementById("waitingMessage").innerText = T("submitted");
