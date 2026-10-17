@@ -74,28 +74,29 @@
         .player-name-display svg { vertical-align: middle; margin-right: 8px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
         .vote-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
         .mini-mask { width: 38px; height: auto; border-radius: 10px; vertical-align: middle; box-shadow: 0 2px 5px rgba(0,0,0,.4); }
+        .mini-mask:not([src]), .mini-mask[src=""] { display: none; }
         h2 .mini-mask { margin-right: 10px; }
         #waitingMessage { font-size: 22px; font-weight: bold; color: #101010; margin-top: 20px; letter-spacing: 1px; }
         #notice { display: none; font-size: 21px; font-weight: bold; color: #101010; margin: 12px 0 4px; letter-spacing: 1px; }
         .meme-display.chale { background: #30343b; }
         .meme-display.chale img { width: 58%; margin: 20% auto; border: none; background: transparent; }
 
-        .meme-option { width: 80%; max-width: 250px; border: 4px solid transparent; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
+        .meme-option { width: 80%; max-width: 250px; border: 5px solid #000000; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
         .meme-option.video-vertical {
             width: 44%; max-width: 175px; aspect-ratio: 9 / 16; object-fit: cover;
             background: #000; display: inline-block; margin: 6px; vertical-align: top;
-            border: 3px solid var(--gold); overflow: hidden; position: relative;
+            border: 5px solid #000000; overflow: hidden; position: relative;
         }
         .meme-option.video-vertical canvas {
             width: 100% !important; height: 100% !important; object-fit: cover; display: block;
         }
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
         .meme-display.video-card { width: 68%; max-width: 225px; aspect-ratio: 9 / 16; }
-        .meme-display img { width: 100%; border-radius: 10px; border: 3px solid #00b4d8; display: block; }
+        .meme-display img { width: 100%; border-radius: 10px; border: 5px solid #000000; display: block; }
         .meme-display video,
         .meme-display ogvjs {
             width: 100%; height: 100%; aspect-ratio: 9 / 16; object-fit: cover;
-            border-radius: 10px; border: 3px solid #00b4d8; display: block; background: #000;
+            border-radius: 10px; border: 5px solid #000000; display: block; background: #000;
             overflow: hidden; box-sizing: border-box;
         }
         .meme-display ogvjs canvas {
@@ -175,16 +176,26 @@
             }
         })();
 
+        // ── Peer template cache (images & videos picked by other players) ──
+        // When any player picks an image or video template, the host broadcasts
+        // PRELOAD,<url> so every phone caches and decodes it in memory while
+        // captions are still being written — making voting completely lag-free.
+        const peerImageCache = {};
+        const peerVideoBlobCache = {};
+        const peerVideoFetchInFlight = {};
+
         // Creates a looping muted video element that plays .ogv natively on
         // Android/Desktop and automatically falls back to OGVPlayer on iOS Safari.
+        // Uses in-memory Blob URLs when preloaded so playback starts instantaneously.
         function createVideoElement(url, className) {
             const isOgv = /\.ogv(\?.*)?$/i.test(url || "");
+            const playUrl = peerVideoBlobCache[url] || url;
             if (isOgv && !CAN_PLAY_OGV_NATIVE && window.OGVPlayer) {
                 const player = new OGVPlayer({ enableWebM: false });
                 if (className) player.className = className;
                 player.muted = true;
                 player.loop = true;
-                player.src = url;
+                player.src = playUrl;
                 player.addEventListener("ended", () => {
                     try { player.currentTime = 0; player.play(); } catch (e) {}
                 });
@@ -192,7 +203,8 @@
                 return player;
             }
             const vid = document.createElement("video");
-            vid.src = url;
+            vid.preload = "auto";
+            vid.src = playUrl;
             vid.autoplay = true;
             vid.loop = true;
             vid.muted = true;
@@ -259,9 +271,14 @@
         }
 
         function preloadSingleImage(url) {
+            if (!url) return Promise.resolve({ url: "", img: null });
+            if (peerImageCache[url] && peerImageCache[url].complete) {
+                return Promise.resolve({ url, img: peerImageCache[url] });
+            }
             return new Promise(resolve => {
                 const im = new Image();
                 im.decoding = "async";
+                peerImageCache[url] = im;
                 let done = false;
                 const finish = () => {
                     if (done) return;
@@ -278,6 +295,32 @@
             });
         }
 
+        function preloadSingleVideo(url) {
+            if (!url) return Promise.resolve("");
+            if (peerVideoBlobCache[url]) return Promise.resolve(peerVideoBlobCache[url]);
+            if (peerVideoFetchInFlight[url]) return peerVideoFetchInFlight[url];
+            peerVideoFetchInFlight[url] = fetch(url, { cache: "force-cache" })
+                .then(r => r.ok ? r.blob() : null)
+                .then(blob => {
+                    if (blob && blob.size > 0) {
+                        peerVideoBlobCache[url] = URL.createObjectURL(blob);
+                    }
+                    return peerVideoBlobCache[url] || url;
+                })
+                .catch(() => url)
+                .finally(() => { delete peerVideoFetchInFlight[url]; });
+            return peerVideoFetchInFlight[url];
+        }
+
+        function preloadMediaOnPhone(url) {
+            if (!url) return;
+            if (isVideoUrl(url)) {
+                preloadSingleVideo(url);
+            } else {
+                preloadSingleImage(url);
+            }
+        }
+
         async function ensurePreloadedBatches(targetBatches = 2, batchSize = 4) {
             await imagePoolReady;
             if (imagePool.length === 0 || preloadingInFlight) return;
@@ -291,7 +334,7 @@
                     preloadedImageBatches.push(items);
                 }
                 // Once the upcoming image batches are cached, gently pre-warm
-                // the Round 4 videos in the background HTTP cache
+                // the Round 4 videos in memory
                 if (!videosPrewarmed) {
                     videosPrewarmed = true;
                     prewarmVideosInBackground();
@@ -305,7 +348,7 @@
             await videoPoolReady;
             for (const vUrl of videoPool) {
                 try {
-                    await fetch(vUrl, { cache: "force-cache" });
+                    await preloadSingleVideo(vUrl);
                 } catch (e) {}
             }
         }
@@ -458,7 +501,11 @@
             let img = document.createElement("img");
             img.className = "mini-mask";
             img.dataset.maskfor = name;
-            if (maskByName[name]) img.src = maskByName[name];
+            if (maskByName[name]) {
+                img.src = maskByName[name];
+            } else {
+                img.style.display = "none";
+            }
             return img;
         }
 
@@ -530,11 +577,17 @@
                 card.appendChild(vid);
             } else {
                 if (isFinalRound) card.classList.add("video-card");
-                let img = document.createElement("img");
+                let img;
                 if (!imgUrl && name && maskByName[name]) {
+                    img = document.createElement("img");
                     img.src = maskByName[name];
                     card.classList.add("chale");
+                } else if (imgUrl && peerImageCache[imgUrl] && peerImageCache[imgUrl].complete) {
+                    img = peerImageCache[imgUrl].cloneNode(false);
+                    img.className = "";
+                    img.onclick = null;
                 } else {
+                    img = document.createElement("img");
                     img.src = imgUrl;
                 }
                 card.appendChild(img);
@@ -696,15 +749,15 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         // rasterize the designed mask so the host lobby shows the EXACT mask
         function maskToPngDataURL() {
             const entry = MASK_ART[maskCfg.mask];
-            const svg = maskSVG(entry, 400, true);
+            const svg = maskSVG(entry, 220, true);
             return new Promise((resolve) => {
                 const img = new Image();
                 const blob = new Blob([svg], { type: "image/svg+xml" });
                 const url = URL.createObjectURL(blob);
                 img.onload = () => {
                     const canvas = document.createElement("canvas");
-                    canvas.width = 400;
-                    canvas.height = Math.round(400 * entry.h / entry.w);
+                    canvas.width = 220;
+                    canvas.height = Math.round(220 * entry.h / entry.w);
                     canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
                     URL.revokeObjectURL(url);
                     try { resolve(canvas.toDataURL("image/png")); } catch (e) { resolve(""); }
@@ -831,6 +884,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 // Send the mask design + a small PNG snapshot of the EXACT
                 // designed mask, so the host lobby shows the real artwork
                 const png = await maskToPngDataURL();
+                if (png) maskByName[playerName] = png;
                 socket.send(["JOIN", playerName, maskCfg.mask, ...maskCfg.colors, png].join(","));
                 try {
                     localStorage.setItem("luchador", JSON.stringify(maskCfg));
@@ -842,6 +896,14 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 let message = event.data instanceof Blob ? await event.data.text() : event.data;
                 let parts = message.split(",");
                 let command = parts[0];
+
+                if (command === "PRELOAD") {
+                    // PRELOAD,url — another player just picked an image or video
+                    // template; cache & decode it in memory right now so voting is lag-free.
+                    let mediaUrl = parts.slice(1).join(",");
+                    preloadMediaOnPhone(mediaUrl);
+                    return;
+                }
 
                 if (command === "NEW_ROUND") {
                     let seconds = parseInt(parts[1]);
@@ -1015,10 +1077,12 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     // itself contains commas, so rejoin everything after the name
                     let maskOwner = parts[1];
                     let png = parts.slice(2).join(",");
-                    maskByName[maskOwner] = png;
-                    // fill in avatars on screens that were already rendered
-                    document.querySelectorAll(`img[data-maskfor="${CSS.escape(maskOwner)}"]`)
-                        .forEach(el => { el.src = png; });
+                    if (png) {
+                        maskByName[maskOwner] = png;
+                        // fill in avatars on screens that were already rendered
+                        document.querySelectorAll(`img[data-maskfor="${CSS.escape(maskOwner)}"]`)
+                            .forEach(el => { el.src = png; el.style.display = ""; });
+                    }
                 }
 
                 if (command === "MATCH_WINNER") {
@@ -1074,7 +1138,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         overMsg.appendChild(overMask);
                         overMsg.appendChild(document.createTextNode(" "));
                     }
-                    // the name reveals letter by letter over 10 seconds
+                    // the name reveals letter by letter over 3 seconds
                     let revealSpan = document.createElement("span");
                     overMsg.appendChild(revealSpan);
                     let full = T("ultimate", parts[1]);
@@ -1086,7 +1150,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                             clearInterval(window.__revealTimer);
                             window.__revealTimer = null;
                         }
-                    }, 10000 / full.length);
+                    }, 3000 / full.length);
                 }
             };
             socket.onclose = () => {
