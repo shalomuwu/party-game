@@ -81,23 +81,23 @@
         .meme-display.chale { background: #30343b; }
         .meme-display.chale img { width: 58%; margin: 20% auto; border: none; background: transparent; }
 
-        .meme-option { width: 80%; max-width: 250px; border: 5px solid #000000; border-radius: 10px; cursor: pointer; margin-bottom: 15px; transition: 0.2s;}
+        .meme-option { width: 80%; max-width: 250px; border: 5px solid #000000; border-radius: 10px; cursor: pointer; margin: 6px 8px 15px; transition: 0.2s;}
         .meme-option.video-vertical {
-            width: 44%; max-width: 175px; aspect-ratio: 9 / 16; object-fit: cover;
-            background: #000; display: inline-block; margin: 6px; vertical-align: top;
-            border: 5px solid #000000; overflow: hidden; position: relative;
+            width: 42%; max-width: 170px; aspect-ratio: 9 / 16; object-fit: cover;
+            background: #000; display: inline-block; margin: 6px 8px; vertical-align: top;
+            border: 5px solid #000000; overflow: hidden; position: relative; box-sizing: content-box;
         }
         .meme-option.video-vertical canvas {
             width: 100% !important; height: 100% !important; object-fit: cover; display: block;
         }
         .meme-display { position: relative; display: inline-block; width: 80%; max-width: 300px; margin-bottom: 15px; }
-        .meme-display.video-card { width: 68%; max-width: 225px; aspect-ratio: 9 / 16; }
+        .meme-display.video-card { width: 68%; max-width: 225px; }
         .meme-display img { width: 100%; border-radius: 10px; border: 5px solid #000000; display: block; }
         .meme-display video,
         .meme-display ogvjs {
-            width: 100%; height: 100%; aspect-ratio: 9 / 16; object-fit: cover;
+            width: calc(100% - 10px); height: auto; aspect-ratio: 9 / 16; object-fit: cover;
             border-radius: 10px; border: 5px solid #000000; display: block; background: #000;
-            overflow: hidden; box-sizing: border-box;
+            overflow: hidden; box-sizing: content-box; margin: 0 auto;
         }
         .meme-display ogvjs canvas {
             width: 100% !important; height: 100% !important; object-fit: cover; display: block;
@@ -149,7 +149,7 @@
             <h3 id="writeTitle">Write your best joke!</h3>
             <div id="captionPreviewBox" class="meme-display" style="margin-bottom: 10px;">
                 <img id="captionImage" src="" style="width: 100%; border-radius: 10px;">
-                <div id="captionVideoMount" style="display: none; width: 100%; height: 100%;"></div>
+                <div id="captionVideoMount" style="display: none; width: 100%;"></div>
                 <div id="previewTop" class="meme-text meme-top"></div>
                 <div id="previewBottom" class="meme-text meme-bottom"></div>
             </div>
