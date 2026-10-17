@@ -104,7 +104,7 @@
         }
         .meme-text {
             position: absolute; width: 100%; text-align: center; color: white;
-            font-family: 'Impact', sans-serif; font-size: 26px; text-transform: uppercase;
+            font-family: 'Impact', sans-serif; font-size: 26px;
             text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000,
                          2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000,
                          1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
@@ -777,7 +777,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 join_game: "JOIN THE GAME", nickname: "YOUR NICKNAME", join: "JOIN",
                 connecting: "CONNECTING...", design: "DESIGN YOUR LUCHADOR",
                 select_mask: "SELECT MASK", base: "BASE COLOR", accent: "ACCENT {0}",
-                pick: "Pick your template!", pick_video: "\uD83D\uDD25 FINAL ROUND! Pick your 9:16 video:",
+                pick: "Pick your template!", pick_video: "\uD83D\uDD25 VIDEO ROUND! Pick your video:",
                 write: "Write your best joke!",
                 top: "TOP TEXT", bottom: "BOTTOM TEXT", finish: "FINISH",
                 playing: "Playing as: {0}", waiting_host: "Waiting for Host...",
@@ -790,15 +790,16 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 ultimate: "\uD83C\uDFC6 ULTIMATE WINNER: {0} \uD83C\uDFC6",
                 you_second: "\u26A1 YOU have to make a SECOND meme! Pick a template:",
                 other_second: "\u23F3 {0} has to make a second meme...",
-                final_you: "\uD83D\uDD25 FINAL 1v1: {0} vs {1}! Make a 9:16 vertical video meme!",
-                final_spectator_caption: "\uD83D\uDD25 FINAL ROUND: {0} vs {1} are making their 9:16 video memes!",
-                final_spectator_vote: "\uD83D\uDD25 FINAL ROUND! Spectators are voting..."
+                final_you: "\uD83D\uDD25 VIDEO ROUND: {0} vs {1}! Make a video meme!",
+                final_spectator_caption: "\uD83D\uDD25 VIDEO ROUND: {0} vs {1} are making their video memes!",
+                final_spectator_vote: "\uD83D\uDD25 VIDEO ROUND! Spectators are voting...",
+                video_preview: "\uD83D\uDD25 VIDEO ROUND"
             },
             es: {
                 join_game: "\u00DANETE AL JUEGO", nickname: "TU APODO", join: "UNIRME",
                 connecting: "CONECTANDO...", design: "DISE\u00D1A TU LUCHADOR",
                 select_mask: "ELIGE TU M\u00C1SCARA", base: "COLOR BASE", accent: "ACENTO {0}",
-                pick: "\u00A1Elige tu plantilla!", pick_video: "\uD83D\uDD25 \u00A1RONDA FINAL! Elige tu video 9:16:",
+                pick: "\u00A1Elige tu plantilla!", pick_video: "\uD83D\uDD25 \u00A1RONDA DE VIDEO! Elige tu video:",
                 write: "\u00A1Escribe tu mejor broma!",
                 top: "TEXTO DE ARRIBA", bottom: "TEXTO DE ABAJO", finish: "LISTO",
                 playing: "Jugando como: {0}", waiting_host: "Esperando al anfitri\u00F3n...",
@@ -811,9 +812,10 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 ultimate: "\uD83C\uDFC6 GANADOR ABSOLUTO: {0} \uD83C\uDFC6",
                 you_second: "\u26A1 \u00A1T\u00DA tienes que hacer un SEGUNDO meme! Elige una plantilla:",
                 other_second: "\u23F3 {0} tiene que hacer un segundo meme...",
-                final_you: "\uD83D\uDD25 FINAL 1v1: \u00A1{0} vs {1}! \u00A1Crea un video meme vertical 9:16!",
-                final_spectator_caption: "\uD83D\uDD25 RONDA FINAL: \u00A1{0} vs {1} est\u00E1n creando sus video memes 9:16!",
-                final_spectator_vote: "\uD83D\uDD25 \u00A1RONDA FINAL! Los espectadores est\u00E1n votando..."
+                final_you: "\uD83D\uDD25 RONDA DE VIDEO: \u00A1{0} vs {1}! \u00A1Crea un video meme!",
+                final_spectator_caption: "\uD83D\uDD25 RONDA DE VIDEO: \u00A1{0} vs {1} est\u00E1n creando sus video memes!",
+                final_spectator_vote: "\uD83D\uDD25 \u00A1RONDA DE VIDEO! Los espectadores est\u00E1n votando...",
+                video_preview: "\uD83D\uDD25 RONDA DE VIDEO"
             }
         };
         function T(key) {
@@ -956,6 +958,36 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     startLocalTimer(seconds);
                 }
 
+                if (command === "VIDEO_PREVIEW") {
+                    // Format: VIDEO_PREVIEW,seconds,name,top,bottom,img
+                    // Shows one finalist's video meme alone for 10 seconds before voting opens.
+                    let seconds = parseInt(parts[1]);
+                    let name = parts[2] || "", top = parts[3] || "", bottom = parts[4] || "", img = parts[5] || "";
+
+                    document.getElementById("captionScreen").style.display = "none";
+                    document.getElementById("imageScreen").style.display = "none";
+                    document.getElementById("notice").style.display = "none";
+                    document.getElementById("matchWinnerScreen").style.display = "none";
+
+                    let voteScreen = document.getElementById("voteScreen");
+                    voteScreen.querySelectorAll("video, ogvjs").forEach(v => {
+                        try { if (typeof v.pause === "function") v.pause(); } catch (e) {}
+                    });
+                    voteScreen.style.display = "block";
+                    voteScreen.innerHTML = "<h3 style='color:#ffbe0b;'>" + T("video_preview") + "</h3>";
+                    voteScreen.appendChild(makeMemeCard(img, top, bottom, name));
+                    let nameRow = document.createElement("div");
+                    nameRow.className = "vote-row";
+                    nameRow.appendChild(maskAvatar(name));
+                    let label = document.createElement("span");
+                    label.style.fontWeight = "bold";
+                    label.style.fontSize = "20px";
+                    label.textContent = name;
+                    nameRow.appendChild(label);
+                    voteScreen.appendChild(nameRow);
+                    startLocalTimer(seconds);
+                }
+
                 if (command === "VOTE_TIME") {
                     let seconds = parseInt(parts[1]);
                     // Format: VOTE_TIME,seconds,count, then per meme: name,top,bottom,img
@@ -967,6 +999,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     document.getElementById("notice").style.display = "none";
 
                     let voteScreen = document.getElementById("voteScreen");
+                    voteScreen.querySelectorAll("video, ogvjs").forEach(v => {
+                        try { if (typeof v.pause === "function") v.pause(); } catch (e) {}
+                    });
                     voteScreen.style.display = "block";
 
                     currentMatchup = [];
@@ -997,6 +1032,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     document.getElementById("notice").style.display = "none";
 
                     let voteScreen = document.getElementById("voteScreen");
+                    voteScreen.querySelectorAll("video, ogvjs").forEach(v => {
+                        try { if (typeof v.pause === "function") v.pause(); } catch (e) {}
+                    });
                     voteScreen.style.display = "block";
 
                     currentMatchup = [];
