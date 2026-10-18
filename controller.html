@@ -187,18 +187,20 @@
         // Creates a looping muted video element that plays .ogv natively on
         // Android/Desktop and automatically falls back to OGVPlayer on iOS Safari.
         // Uses in-memory Blob URLs when preloaded so playback starts instantaneously.
-        function createVideoElement(url, className) {
+        function createVideoElement(url, className, shouldLoop = true) {
             const isOgv = /\.ogv(\?.*)?$/i.test(url || "");
             const playUrl = peerVideoBlobCache[url] || url;
             if (isOgv && !CAN_PLAY_OGV_NATIVE && window.OGVPlayer) {
                 const player = new OGVPlayer({ enableWebM: false });
                 if (className) player.className = className;
                 player.muted = true;
-                player.loop = true;
+                player.loop = shouldLoop;
                 player.src = playUrl;
-                player.addEventListener("ended", () => {
-                    try { player.currentTime = 0; player.play(); } catch (e) {}
-                });
+                if (shouldLoop) {
+                    player.addEventListener("ended", () => {
+                        try { player.currentTime = 0; player.play(); } catch (e) {}
+                    });
+                }
                 setTimeout(() => { try { player.play(); } catch (e) {} }, 30);
                 return player;
             }
@@ -206,7 +208,7 @@
             vid.preload = "auto";
             vid.src = playUrl;
             vid.autoplay = true;
-            vid.loop = true;
+            vid.loop = shouldLoop;
             vid.muted = true;
             vid.playsInline = true;
             vid.setAttribute("playsinline", "");
@@ -568,12 +570,12 @@
         // Builds a meme card safely: caption text goes in via textContent,
         // so players can't break the screen by typing < or " in their jokes.
         // Supports both 1:1 images and 9:16 vertical videos.
-        function makeMemeCard(imgUrl, topText, bottomText, name) {
+        function makeMemeCard(imgUrl, topText, bottomText, name, shouldLoop = true) {
             let card = document.createElement("div");
             card.className = "meme-display";
             if (isVideoUrl(imgUrl)) {
                 card.classList.add("video-card");
-                let vid = createVideoElement(imgUrl, "");
+                let vid = createVideoElement(imgUrl, "", shouldLoop);
                 card.appendChild(vid);
             } else {
                 if (isFinalRound) card.classList.add("video-card");
@@ -793,7 +795,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 final_you: "\uD83D\uDD25 VIDEO ROUND: {0} vs {1}! Make a video meme!",
                 final_spectator_caption: "\uD83D\uDD25 VIDEO ROUND: {0} vs {1} are making their video memes!",
                 final_spectator_vote: "\uD83D\uDD25 VIDEO ROUND! Spectators are voting...",
-                video_preview: "\uD83D\uDD25 VIDEO ROUND"
+                video_preview: "\uD83D\uDD25 VIDEO ROUND",
+                meme_preview: "\uD83D\uDC40 1v1 SHOWCASE"
             },
             es: {
                 join_game: "\u00DANETE AL JUEGO", nickname: "TU APODO", join: "UNIRME",
@@ -815,7 +818,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 final_you: "\uD83D\uDD25 RONDA DE VIDEO: \u00A1{0} vs {1}! \u00A1Crea un video meme!",
                 final_spectator_caption: "\uD83D\uDD25 RONDA DE VIDEO: \u00A1{0} vs {1} est\u00E1n creando sus video memes!",
                 final_spectator_vote: "\uD83D\uDD25 \u00A1RONDA DE VIDEO! Los espectadores est\u00E1n votando...",
-                video_preview: "\uD83D\uDD25 RONDA DE VIDEO"
+                video_preview: "\uD83D\uDD25 RONDA DE VIDEO",
+                meme_preview: "\uD83D\uDC40 PRESENTACI\u00D3N 1v1"
             }
         };
         function T(key) {
@@ -960,7 +964,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                 if (command === "VIDEO_PREVIEW") {
                     // Format: VIDEO_PREVIEW,seconds,name,top,bottom,img
-                    // Shows one finalist's video meme alone for 10 seconds before voting opens.
+                    // Shows one player's meme alone (7s for image rounds, exact video duration for Video Round) before voting opens.
                     let seconds = parseInt(parts[1]);
                     let name = parts[2] || "", top = parts[3] || "", bottom = parts[4] || "", img = parts[5] || "";
 
@@ -974,8 +978,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         try { if (typeof v.pause === "function") v.pause(); } catch (e) {}
                     });
                     voteScreen.style.display = "block";
-                    voteScreen.innerHTML = "<h3 style='color:#ffbe0b;'>" + T("video_preview") + "</h3>";
-                    voteScreen.appendChild(makeMemeCard(img, top, bottom, name));
+                    let previewTitle = (isFinalRound || isVideoUrl(img)) ? T("video_preview") : T("meme_preview");
+                    voteScreen.innerHTML = "<h3 style='color:#ffbe0b;'>" + previewTitle + "</h3>";
+                    voteScreen.appendChild(makeMemeCard(img, top, bottom, name, false));
                     let nameRow = document.createElement("div");
                     nameRow.className = "vote-row";
                     nameRow.appendChild(maskAvatar(name));
@@ -1011,7 +1016,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         let name = parts[base], top = parts[base + 1], bottom = parts[base + 2], img = parts[base + 3];
                         currentMatchup.push(name);
                         if (k > 0) voteScreen.appendChild(document.createElement("br"));
-                        voteScreen.appendChild(makeMemeCard(img, top, bottom, name));
+                        voteScreen.appendChild(makeMemeCard(img, top, bottom, name, true));
                         let voteRow = document.createElement("div");
                         voteRow.className = "vote-row";
                         voteRow.appendChild(maskAvatar(name));
@@ -1044,7 +1049,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         let name = parts[base], top = parts[base + 1], bottom = parts[base + 2], img = parts[base + 3];
                         currentMatchup.push(name);
                         if (k > 0) voteScreen.appendChild(document.createElement("br"));
-                        voteScreen.appendChild(makeMemeCard(img, top, bottom, name));
+                        voteScreen.appendChild(makeMemeCard(img, top, bottom, name, true));
                         let nameRow = document.createElement("div");
                         nameRow.className = "vote-row";
                         nameRow.appendChild(maskAvatar(name));
@@ -1145,7 +1150,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         let pointsLabel = document.createElement("h3");
                         pointsLabel.style.color = "yellow";
                         pointsLabel.textContent = T("points", points);
-                        let card = makeMemeCard(imgUrl, topT, botT, winner);
+                        let card = makeMemeCard(imgUrl, topT, botT, winner, false);
                         let mediaEl = card.querySelector("img, video, ogvjs");
                         if (mediaEl) mediaEl.style.borderColor = "yellow";
                         winnerScreen.appendChild(title);
