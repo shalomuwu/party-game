@@ -110,6 +110,21 @@
                          1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
             left: 0; padding: 0 10px; box-sizing: border-box; word-wrap: break-word; pointer-events: none;
         }
+        /* ── Tee K.O. phases ── */
+        .texts-col { display: inline-block; width: 46%; vertical-align: top; margin: 0 1%; text-align: left; }
+        .texts-head { font-weight: bold; letter-spacing: 2px; color: #ffd166; margin: 8px 0 4px; text-align: center; }
+        .texts-col input {
+            width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 15px;
+            margin: 3px 0; border-radius: 8px; background: #eadcbf; color: #101010;
+            border: 2px solid #b9a37e; outline: none;
+        }
+        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 4px 0 8px; }
+        .text-chip {
+            padding: 8px 10px; font-size: 15px; border-radius: 10px; cursor: pointer;
+            background: #eadcbf; color: #101010; border: 2px solid #b9a37e; max-width: 100%;
+        }
+        .text-chip.selected { background: #1d4da6; color: #fff; border-color: #fff; }
+
         .meme-top { top: 10px; }
         .meme-bottom { bottom: 10px; }
     </style>
@@ -156,6 +171,35 @@
             <br><input type="text" id="topTextInput" placeholder="TOP TEXT" maxlength="30" style="width: 80%;" oninput="updateCaptionPreview()">
             <br><input type="text" id="bottomTextInput" placeholder="BOTTOM TEXT" maxlength="30" style="width: 80%;" oninput="updateCaptionPreview()">
             <br><button id="finishBtn" class="btn" onclick="submitMeme()">FINISH</button>
+        </div>
+
+        <div id="textPhaseScreen" style="display: none;">
+            <h3 id="textPhaseTitle">&#9998; WRITE YOUR TEXTS!</h3>
+            <div id="textSecondNotice" style="display:none; color:#ffd166; font-weight:bold; margin:4px 0;"></div>
+            <div class="texts-col">
+                <div class="texts-head">TOP</div>
+                <div id="topTextInputs"></div>
+            </div>
+            <div class="texts-col">
+                <div class="texts-head">BOTTOM</div>
+                <div id="bottomTextInputs"></div>
+            </div>
+            <div id="textHint" style="font-size:13px; opacity:.8; margin-top:6px;"></div>
+        </div>
+
+        <div id="teekoCaptionScreen" style="display: none;">
+            <h3 id="teekoTitle">Build your meme!</h3>
+            <div id="teekoPreviewBox" class="meme-display" style="margin-bottom: 10px;">
+                <img id="teekoImage" src="" style="width: 100%; border-radius: 10px;">
+                <div id="teekoVideoMount" style="display: none; width: 100%;"></div>
+                <div id="teekoTopPreview" class="meme-text meme-top"></div>
+                <div id="teekoBottomPreview" class="meme-text meme-bottom"></div>
+            </div>
+            <div class="texts-head">TOP</div>
+            <div id="topChoiceChips" class="chip-row"></div>
+            <div class="texts-head">BOTTOM</div>
+            <div id="bottomChoiceChips" class="chip-row"></div>
+            <br><button id="teekoFinishBtn" class="btn" onclick="submitTeeko()">FINISH</button>
         </div>
 
         <div id="voteScreen" style="display: none;"></div>
@@ -796,7 +840,16 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 final_spectator_caption: "\uD83D\uDD25 VIDEO ROUND: {0} vs {1} are making their video memes!",
                 final_spectator_vote: "\uD83D\uDD25 VIDEO ROUND! Spectators are voting...",
                 video_preview: "\uD83D\uDD25 VIDEO ROUND",
-                meme_preview: "\uD83D\uDC40 1v1 SHOWCASE"
+                meme_preview: "\uD83D\uDC40 1v1 SHOWCASE",
+                text_phase_title: "\u270E WRITE YOUR TEXTS!",
+                texts_hint: "Up to 7 top + 7 bottom lines. They are saved as you type!",
+                you_make_two: "\u26A1 YOU will assemble TWO memes next phase!",
+                meme_phase_title: "\uD83E\uDDF5 Build your meme: pick template + texts!",
+                pick_top: "Pick the TOP text",
+                pick_bottom: "Pick the BOTTOM text",
+                teeko_missing: "Pick a template, one TOP and one BOTTOM!",
+                final_you_everyone: "\uD83D\uDD25 VIDEO ROUND: EVERYONE makes a video meme!",
+                final_you_second: "\u26A1 Make your SECOND video meme!"
             },
             es: {
                 join_game: "\u00DANETE AL JUEGO", nickname: "TU APODO", join: "UNIRME",
@@ -819,7 +872,16 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 final_spectator_caption: "\uD83D\uDD25 RONDA DE VIDEO: \u00A1{0} vs {1} est\u00E1n creando sus video memes!",
                 final_spectator_vote: "\uD83D\uDD25 \u00A1RONDA DE VIDEO! Los espectadores est\u00E1n votando...",
                 video_preview: "\uD83D\uDD25 RONDA DE VIDEO",
-                meme_preview: "\uD83D\uDC40 PRESENTACI\u00D3N 1v1"
+                meme_preview: "\uD83D\uDC40 PRESENTACI\u00D3N 1v1",
+                text_phase_title: "\u270E ESCRIBAN SUS TEXTOS!",
+                texts_hint: "Hasta 7 de arriba + 7 de abajo. Se guardan al escribir!",
+                you_make_two: "\u26A1 T\u00DA armar\u00E1s DOS memes en la siguiente fase!",
+                meme_phase_title: "\uD83E\uDDF5 Arma tu meme: plantilla + textos!",
+                pick_top: "Elige el texto de ARRIBA",
+                pick_bottom: "Elige el texto de ABAJO",
+                teeko_missing: "Elige plantilla, un texto de ARRIBA y uno de ABAJO!",
+                final_you_everyone: "\uD83D\uDD25 RONDA DE VIDEO: \u00A1TODOS crean un video meme!",
+                final_you_second: "\u26A1 \u00A1Crea tu SEGUNDO video meme!"
             }
         };
         function T(key) {
@@ -859,6 +921,169 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             }
         }
         applyLang();
+
+        // ── Tee K.O. mode state ──
+        let teekoMode = false;
+        let textTopOpts = [];
+        let textBotOpts = [];
+        let teekoTop = "";
+        let teekoBottom = "";
+        const textDrafts = { tops: Array(7).fill(""), bottoms: Array(7).fill("") };
+        let textsSendTimer = null;
+
+        function _hideAllGameScreens() {
+            ["textPhaseScreen", "teekoCaptionScreen", "imageScreen", "captionScreen",
+             "voteScreen", "matchWinnerScreen"].forEach(id => {
+                document.getElementById(id).style.display = "none";
+            });
+        }
+
+        function buildTextInputs() {
+            for (const [kind, boxId] of [["tops", "topTextInputs"], ["bottoms", "bottomTextInputs"]]) {
+                let box = document.getElementById(boxId);
+                box.innerHTML = "";
+                for (let i = 0; i < 7; i++) {
+                    let inp = document.createElement("input");
+                    inp.type = "text";
+                    inp.maxLength = 40;
+                    inp.placeholder = (kind === "tops" ? "TOP " : "BOTTOM ") + (i + 1);
+                    inp.value = textDrafts[kind][i];
+                    inp.oninput = () => { textDrafts[kind][i] = inp.value; queueTextsSend(); };
+                    box.appendChild(inp);
+                }
+            }
+            document.getElementById("textPhaseTitle").textContent = T("text_phase_title");
+            document.getElementById("textHint").textContent = T("texts_hint");
+        }
+
+        function queueTextsSend() {
+            if (textsSendTimer) clearTimeout(textsSendTimer);
+            textsSendTimer = setTimeout(sendTextsBatch, 450);
+        }
+
+        function sendTextsBatch() {
+            if (!socket || socket.readyState !== 1) return;
+            const clean = a => a.map(t => t.trim().replace(/[,;|]/g, "")).filter(t => t !== "");
+            const tops = clean(textDrafts.tops).slice(0, 7);
+            const bots = clean(textDrafts.bottoms).slice(0, 7);
+            if (tops.length === 0 && bots.length === 0) return;
+            socket.send("TEXTS," + playerName + "," + tops.join(";") + "|" + bots.join(";"));
+        }
+
+        // TEXT_ROUND,seconds,secondMemeMaker
+        function handleTextRound(parts) {
+            const seconds = parseInt(parts[1]);
+            const second = parts[2] || "";
+            teekoMode = true;
+            isFinalRound = false;
+            mySubmitted = false;
+            if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
+            if (textsSendTimer) { clearTimeout(textsSendTimer); textsSendTimer = null; }
+            _hideAllGameScreens();
+            document.getElementById("notice").style.display = "none";
+            buildTextInputs();
+            const twoEl = document.getElementById("textSecondNotice");
+            if (second === playerName) {
+                twoEl.textContent = T("you_make_two");
+                twoEl.style.display = "block";
+            } else {
+                twoEl.style.display = "none";
+            }
+            document.getElementById("textPhaseScreen").style.display = "block";
+            startLocalTimer(seconds);
+            // save whatever is typed when time runs out
+            setTimeout(() => { if (document.getElementById("textPhaseScreen").style.display === "block") sendTextsBatch(); }, seconds * 1000);
+        }
+
+        // TEXTOPTS,top1;top2|bot1;bot2
+        function handleTextOpts(parts) {
+            const rest = parts.slice(1).join(",");
+            const halves = rest.split("|", 2);
+            textTopOpts = (halves[0] || "").split(";").filter(t => t !== "");
+            textBotOpts = (halves[1] || "").split(";").filter(t => t !== "");
+        }
+
+        // MEME_ROUND,seconds
+        function handleMemeRound(parts) {
+            const seconds = parseInt(parts[1]);
+            teekoMode = true;
+            mySubmitted = false;
+            selectedImage = "";
+            teekoTop = "";
+            teekoBottom = "";
+            _hideAllGameScreens();
+            const notice = document.getElementById("notice");
+            notice.style.display = "block";
+            notice.innerText = T("meme_phase_title");
+            showRandomTemplates(4);
+            document.getElementById("imageScreen").style.display = "block";
+            startLocalTimer(seconds);
+        }
+
+        function buildChoiceChips() {
+            for (const [opts, sel, boxId, kind] of [
+                [textTopOpts, teekoTop, "topChoiceChips", "top"],
+                [textBotOpts, teekoBottom, "bottomChoiceChips", "bottom"]
+            ]) {
+                let box = document.getElementById(boxId);
+                box.innerHTML = "";
+                opts.forEach(txt => {
+                    let chip = document.createElement("div");
+                    chip.className = "text-chip" + (sel === txt ? " selected" : "");
+                    chip.textContent = txt;
+                    chip.onclick = () => {
+                        if (kind === "top") teekoTop = (teekoTop === txt ? "" : txt);
+                        else teekoBottom = (teekoBottom === txt ? "" : txt);
+                        updateTeekoPreview();
+                        buildChoiceChips();
+                    };
+                    box.appendChild(chip);
+                });
+            }
+            document.getElementById("teekoTitle").textContent = T("meme_phase_title");
+        }
+
+        function updateTeekoPreview() {
+            document.getElementById("teekoTopPreview").textContent = teekoTop;
+            document.getElementById("teekoBottomPreview").textContent = teekoBottom;
+        }
+
+        function openTeekoCaption() {
+            _hideAllGameScreens();
+            const imgEl = document.getElementById("teekoImage");
+            const mount = document.getElementById("teekoVideoMount");
+            try { if (typeof stopVideoMount === "function") stopVideoMount(); } catch (e) {}
+            mount.innerHTML = "";
+            if (typeof isVideoUrl === "function" && isVideoUrl(selectedImage)) {
+                imgEl.style.display = "none";
+                imgEl.removeAttribute("src");
+                mount.style.display = "block";
+                if (typeof createVideoElement === "function") {
+                    mount.appendChild(createVideoElement(selectedImage, ""));
+                }
+            } else {
+                imgEl.style.display = "block";
+                imgEl.src = selectedImage;
+                mount.style.display = "none";
+            }
+            updateTeekoPreview();
+            buildChoiceChips();
+            document.getElementById("teekoCaptionScreen").style.display = "block";
+        }
+
+        function submitTeeko() {
+            if (!selectedImage || !teekoTop || !teekoBottom) {
+                const notice = document.getElementById("notice");
+                notice.style.display = "block";
+                notice.innerText = T("teeko_missing");
+                return;
+            }
+            mySubmitted = true;
+            socket.send("SUBMIT_MEME," + playerName + "," + teekoTop + "," + teekoBottom + "," + selectedImage);
+            _hideAllGameScreens();
+            document.getElementById("waitingMessage").innerText = T("submitted");
+            document.getElementById("waitingMessage").style.display = "block";
+        }
 
         function startLocalTimer(seconds) {
             clearInterval(localTimer);
@@ -913,6 +1138,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
 
                 if (command === "NEW_ROUND") {
                     let seconds = parseInt(parts[1]);
+                    teekoMode = false;
+                    textTopOpts = [];
+                    textBotOpts = [];
                     if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
                     isFinalRound = false;
                     document.getElementById("topTextInput").value = "";
@@ -931,11 +1159,16 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     startLocalTimer(seconds);
                 }
 
+                if (command === "TEXT_ROUND") { handleTextRound(parts); }
+                if (command === "TEXTOPTS") { handleTextOpts(parts); }
+                if (command === "MEME_ROUND") { handleMemeRound(parts); }
+
                 if (command === "FINAL_ROUND") {
                     // Format: FINAL_ROUND,seconds,finalist1,finalist2
                     let seconds = parseInt(parts[1]);
-                    let f1 = parts[2] || "";
-                    let f2 = parts[3] || "";
+                    let finalistsNow = parts.slice(2);
+                    let f1 = finalistsNow[0] || "";
+                    let f2 = finalistsNow.length > 1 ? finalistsNow[1] : "";
                     if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
                     isFinalRound = true;
                     document.getElementById("topTextInput").value = "";
@@ -951,8 +1184,10 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     let notice = document.getElementById("notice");
                     notice.style.display = "block";
 
-                    if (playerName === f1 || playerName === f2) {
-                        notice.innerText = T("final_you", f1, f2);
+                    if (finalistsNow.includes(playerName)) {
+                        notice.innerText = finalistsNow.length > 2
+                            ? T("final_you_everyone")
+                            : T("final_you", f1, f2);
                         showRandomVideos(4);
                         document.getElementById("imageScreen").style.display = "block";
                     } else {
@@ -1094,11 +1329,16 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                         // back to the picker for a SECOND meme
                         mySubmitted = false;
                         selectedImage = "";
+                        teekoTop = "";
+                        teekoBottom = "";
                         document.getElementById("topTextInput").value = "";
                         document.getElementById("bottomTextInput").value = "";
                         updateCaptionPreview();
-                        notice.innerText = T("you_second");
-                        showRandomTemplates(4);
+                        notice.innerText = isFinalRound ? T("final_you_second") : T("you_second");
+                        document.getElementById("textPhaseScreen").style.display = "none";
+                        document.getElementById("teekoCaptionScreen").style.display = "none";
+                        if (isFinalRound) showRandomVideos(4);
+                        else showRandomTemplates(4);
                         document.getElementById("imageScreen").style.display = "block";
                     } else {
                         // everyone else keeps their picker/caption screen —
@@ -1224,8 +1464,13 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         }
 
         function pickImage(imgUrl) {
-            selectedImage = imgUrl; 
+            selectedImage = imgUrl;
             document.getElementById("imageScreen").style.display = "none";
+            if (teekoMode && (textTopOpts.length > 0 || textBotOpts.length > 0)) {
+                openTeekoCaption();
+                socket.send("PICKED," + playerName + "," + imgUrl);
+                return;
+            }
             document.getElementById("captionScreen").style.display = "block";
             const previewBox = document.getElementById("captionPreviewBox");
             const imgEl = document.getElementById("captionImage");
