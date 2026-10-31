@@ -970,19 +970,30 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 inp.type = "text";
                 inp.maxLength = 40;
                 inp.placeholder = T("type_enter_hint", label);
+                // commit on Enter AND when the box loses focus (many mobile
+                // keyboards never send Enter — they just move to the next
+                // field, so blur is the reliable save path on phones)
+                const commit = () => {
+                    const v = inp.value.trim().replace(/[,;|]/g, "");
+                    if (v !== "" && !textDrafts[kind].includes(v) && textDrafts[kind].length < 7) {
+                        textDrafts[kind].push(v);
+                        inp.value = "";
+                        queueTextsSend();
+                        buildTextInputs();
+                        return true;
+                    }
+                    return false;
+                };
                 inp.addEventListener("keydown", (e) => {
                     if (e.key === "Enter") {
                         e.preventDefault();
-                        const v = inp.value.trim().replace(/[,;|]/g, "");
-                        if (v !== "" && !textDrafts[kind].includes(v) && textDrafts[kind].length < 7) {
-                            textDrafts[kind].push(v);
-                            inp.value = "";
-                            queueTextsSend();
-                            buildTextInputs();
-                        }
+                        commit();
                     } else {
                         queueTextsSend();  // partial drafts also sync
                     }
+                });
+                inp.addEventListener("blur", () => {
+                    if (inp.value.trim() !== "") commit();
                 });
                 box.appendChild(inp);
                 // saved lines so far (Tee K.O. style)
@@ -1000,7 +1011,6 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                     savedRow.appendChild(chip);
                 });
                 box.appendChild(savedRow);
-                if (kind === "tops") inp.focus();
             }
             document.getElementById("textPhaseTitle").textContent = T("text_phase_title");
             document.getElementById("textHint").textContent = T("texts_hint");
