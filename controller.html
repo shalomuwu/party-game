@@ -606,6 +606,26 @@
                     let url = pool.splice(idx, 1)[0];
                     let vid = createVideoElement(url, "meme-option video-vertical");
                     vid.onclick = () => pickImage(url);
+                    // self-heal: a tile that fails to load swaps itself for
+                    // another video instead of staying a black rectangle
+                    const heal = () => {
+                        if (pool.length === 0) return;
+                        let nidx = Math.floor(Math.random() * pool.length);
+                        let nurl = pool.splice(nidx, 1)[0];
+                        pool.push(url); // give the failed one another chance later
+                        vid.removeEventListener("error", heal);
+                        let nvid = createVideoElement(nurl, "meme-option video-vertical");
+                        nvid.onclick = () => pickImage(nurl);
+                        nvid.addEventListener("error", () => setTimeout(() => { try { nvid.remove(); } catch(e){} }, 0), { once: true });
+                        vid.replaceWith(nvid);
+                    };
+                    vid.addEventListener("error", heal);
+                    // retry play once for blocked/slow autoplay (black tile fix)
+                    setTimeout(() => {
+                        try {
+                            if (vid.play && vid.paused && vid.readyState >= 2) vid.play().catch(() => {});
+                        } catch (e) {}
+                    }, 800);
                     box.appendChild(vid);
                 }
             });
@@ -842,7 +862,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 video_preview: "\uD83D\uDD25 VIDEO ROUND",
                 meme_preview: "\uD83D\uDC40 1v1 SHOWCASE",
                 text_phase_title: "\u270E WRITE YOUR TEXTS!",
-                texts_hint: "Up to 7 top + 7 bottom lines. They are saved as you type!",
+                texts_hint: "Type a line and press ENTER to save it (up to 7 each). Tap a saved line to delete it.",
+                type_enter_hint: "Write a {0} text + ENTER",
+                no_text_chip: "✖ NO TEXT",
                 you_make_two: "\u26A1 YOU will assemble TWO memes next phase!",
                 meme_phase_title: "\uD83E\uDDF5 Build your meme: pick template + texts!",
                 pick_top: "Pick the TOP text",
@@ -874,7 +896,9 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 video_preview: "\uD83D\uDD25 RONDA DE VIDEO",
                 meme_preview: "\uD83D\uDC40 PRESENTACI\u00D3N 1v1",
                 text_phase_title: "\u270E ESCRIBAN SUS TEXTOS!",
-                texts_hint: "Hasta 7 de arriba + 7 de abajo. Se guardan al escribir!",
+                texts_hint: "Escribe una línea y presiona ENTER para guardarla (máx. 7 c/u). Toca una guardada para borrarla.",
+                type_enter_hint: "Escribe un texto de {0} + ENTER",
+                no_text_chip: "✖ SIN TEXTO",
                 you_make_two: "\u26A1 T\u00DA armar\u00E1s DOS memes en la siguiente fase!",
                 meme_phase_title: "\uD83E\uDDF5 Arma tu meme: plantilla + textos!",
                 pick_top: "Elige el texto de ARRIBA",
@@ -928,7 +952,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         let textBotOpts = [];
         let teekoTop = "";
         let teekoBottom = "";
-        const textDrafts = { tops: Array(7).fill(""), bottoms: Array(7).fill("") };
+        const textDrafts = { tops: [], bottoms: [] };
         let textsSendTimer = null;
 
         function _hideAllGameScreens() {
@@ -939,18 +963,44 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         }
 
         function buildTextInputs() {
-            for (const [kind, boxId] of [["tops", "topTextInputs"], ["bottoms", "bottomTextInputs"]]) {
+            for (const [kind, boxId, label] of [["tops", "topTextInputs", "TOP"], ["bottoms", "bottomTextInputs", "BOTTOM"]]) {
                 let box = document.getElementById(boxId);
                 box.innerHTML = "";
-                for (let i = 0; i < 7; i++) {
-                    let inp = document.createElement("input");
-                    inp.type = "text";
-                    inp.maxLength = 40;
-                    inp.placeholder = (kind === "tops" ? "TOP " : "BOTTOM ") + (i + 1);
-                    inp.value = textDrafts[kind][i];
-                    inp.oninput = () => { textDrafts[kind][i] = inp.value; queueTextsSend(); };
-                    box.appendChild(inp);
-                }
+                let inp = document.createElement("input");
+                inp.type = "text";
+                inp.maxLength = 40;
+                inp.placeholder = T("type_enter_hint", label);
+                inp.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        const v = inp.value.trim().replace(/[,;|]/g, "");
+                        if (v !== "" && !textDrafts[kind].includes(v) && textDrafts[kind].length < 7) {
+                            textDrafts[kind].push(v);
+                            inp.value = "";
+                            queueTextsSend();
+                            buildTextInputs();
+                        }
+                    } else {
+                        queueTextsSend();  // partial drafts also sync
+                    }
+                });
+                box.appendChild(inp);
+                // saved lines so far (Tee K.O. style)
+                let savedRow = document.createElement("div");
+                savedRow.className = "chip-row";
+                textDrafts[kind].forEach(txt => {
+                    let chip = document.createElement("div");
+                    chip.className = "text-chip";
+                    chip.textContent = txt;
+                    chip.onclick = () => {
+                        textDrafts[kind] = textDrafts[kind].filter(t => t !== txt);
+                        queueTextsSend();
+                        buildTextInputs();
+                    };
+                    savedRow.appendChild(chip);
+                });
+                box.appendChild(savedRow);
+                if (kind === "tops") inp.focus();
             }
             document.getElementById("textPhaseTitle").textContent = T("text_phase_title");
             document.getElementById("textHint").textContent = T("texts_hint");
@@ -1027,6 +1077,17 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             ]) {
                 let box = document.getElementById(boxId);
                 box.innerHTML = "";
+                // explicit no-text choice (meme with only bottom / only top / none)
+                let noneChip = document.createElement("div");
+                noneChip.className = "text-chip" + (sel === "" ? " selected" : "");
+                noneChip.textContent = T("no_text_chip");
+                noneChip.onclick = () => {
+                    if (kind === "top") teekoTop = "";
+                    else teekoBottom = "";
+                    updateTeekoPreview();
+                    buildChoiceChips();
+                };
+                box.appendChild(noneChip);
                 opts.forEach(txt => {
                     let chip = document.createElement("div");
                     chip.className = "text-chip" + (sel === txt ? " selected" : "");
@@ -1072,7 +1133,7 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         }
 
         function submitTeeko() {
-            if (!selectedImage || !teekoTop || !teekoBottom) {
+            if (!selectedImage) {
                 const notice = document.getElementById("notice");
                 notice.style.display = "block";
                 notice.innerText = T("teeko_missing");
