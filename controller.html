@@ -297,7 +297,8 @@
         function drawFromImageDeck(count) {
             const picked = [];
             const usedInBatch = new Set();
-            while (picked.length < count && imagePool.length > 0) {
+            let guard = 0;
+            while (picked.length < count && imagePool.length > 0 && guard++ < 200) {
                 if (shuffledImageDeck.length === 0) {
                     shuffledImageDeck = imagePool.slice();
                     for (let i = shuffledImageDeck.length - 1; i > 0; i--) {
@@ -962,6 +963,31 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             });
         }
 
+        function renderSavedTextChips(kind) {
+            const boxId = kind === "tops" ? "topTextInputs" : "bottomTextInputs";
+            const box = document.getElementById(boxId);
+            if (!box) return;
+            let savedRow = box.querySelector(".chip-row");
+            if (!savedRow) {
+                savedRow = document.createElement("div");
+                savedRow.className = "chip-row";
+                box.appendChild(savedRow);
+            }
+            savedRow.innerHTML = "";
+            textDrafts[kind].forEach(txt => {
+                let chip = document.createElement("div");
+                chip.className = "text-chip";
+                chip.textContent = txt;
+                chip.onclick = (e) => {
+                    e.stopPropagation();
+                    textDrafts[kind] = textDrafts[kind].filter(t => t !== txt);
+                    queueTextsSend();
+                    renderSavedTextChips(kind);
+                };
+                savedRow.appendChild(chip);
+            });
+        }
+
         function buildTextInputs() {
             for (const [kind, boxId, label] of [["tops", "topTextInputs", "TOP"], ["bottoms", "bottomTextInputs", "BOTTOM"]]) {
                 let box = document.getElementById(boxId);
@@ -969,48 +995,57 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
                 let inp = document.createElement("input");
                 inp.type = "text";
                 inp.maxLength = 40;
+                inp.setAttribute("enterkeyhint", "send");
+                inp.setAttribute("autocomplete", "off");
                 inp.placeholder = T("type_enter_hint", label);
-                // commit on Enter AND when the box loses focus (many mobile
-                // keyboards never send Enter — they just move to the next
-                // field, so blur is the reliable save path on phones)
-                const commit = () => {
+                // Keep input element alive & focused on Enter so the mobile keyboard
+                // never closes (Jackbox Tee K.O. rapid-fire entry).
+                const commit = (keepFocus = true) => {
                     const v = inp.value.trim().replace(/[,;|]/g, "");
-                    if (v !== "" && !textDrafts[kind].includes(v) && textDrafts[kind].length < 7) {
-                        textDrafts[kind].push(v);
+                    if (v !== "") {
+                        if (!textDrafts[kind].includes(v) && textDrafts[kind].length < 20) {
+                            textDrafts[kind].push(v);
+                        }
                         inp.value = "";
                         queueTextsSend();
-                        buildTextInputs();
+                        renderSavedTextChips(kind);
+                        if (keepFocus) {
+                            try { inp.focus({ preventScroll: true }); } catch (err) { inp.focus(); }
+                        }
                         return true;
+                    }
+                    if (keepFocus) {
+                        try { inp.focus({ preventScroll: true }); } catch (err) { inp.focus(); }
                     }
                     return false;
                 };
                 inp.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" || e.keyCode === 13) {
                         e.preventDefault();
-                        commit();
+                        e.stopPropagation();
+                        commit(true);
                     } else {
                         queueTextsSend();  // partial drafts also sync
                     }
                 });
-                inp.addEventListener("blur", () => {
-                    if (inp.value.trim() !== "") commit();
+                inp.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter" || e.keyCode === 13) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        commit(true);
+                    }
                 });
+                inp.addEventListener("blur", () => {
+                    if (inp.value.trim() !== "") commit(false);
+                });
+                box.onclick = (e) => {
+                    if (e.target === box) inp.focus();
+                };
                 box.appendChild(inp);
-                // saved lines so far (Tee K.O. style)
                 let savedRow = document.createElement("div");
                 savedRow.className = "chip-row";
-                textDrafts[kind].forEach(txt => {
-                    let chip = document.createElement("div");
-                    chip.className = "text-chip";
-                    chip.textContent = txt;
-                    chip.onclick = () => {
-                        textDrafts[kind] = textDrafts[kind].filter(t => t !== txt);
-                        queueTextsSend();
-                        buildTextInputs();
-                    };
-                    savedRow.appendChild(chip);
-                });
                 box.appendChild(savedRow);
+                renderSavedTextChips(kind);
             }
             document.getElementById("textPhaseTitle").textContent = T("text_phase_title");
             document.getElementById("textHint").textContent = T("texts_hint");
@@ -1024,8 +1059,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
         function sendTextsBatch() {
             if (!socket || socket.readyState !== 1) return;
             const clean = a => a.map(t => t.trim().replace(/[,;|]/g, "")).filter(t => t !== "");
-            const tops = clean(textDrafts.tops).slice(0, 7);
-            const bots = clean(textDrafts.bottoms).slice(0, 7);
+            const tops = clean(textDrafts.tops);
+            const bots = clean(textDrafts.bottoms);
             if (tops.length === 0 && bots.length === 0) return;
             socket.send("TEXTS," + playerName + "," + tops.join(";") + "|" + bots.join(";"));
         }
@@ -1037,6 +1072,8 @@ const MASK_ART = [{"name":"CLASSIC","w":100.0,"h":100.0,"fam":{"c1":["45A69F","3
             teekoMode = true;
             isFinalRound = false;
             mySubmitted = false;
+            textDrafts.tops = [];
+            textDrafts.bottoms = [];
             if (window.__revealTimer) { clearInterval(window.__revealTimer); window.__revealTimer = null; }
             if (textsSendTimer) { clearTimeout(textsSendTimer); textsSendTimer = null; }
             _hideAllGameScreens();
